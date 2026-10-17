@@ -174,6 +174,25 @@ export default function Experience() {
           const section = sections.current[i];
           if (section && y >= section.offsetTop - 2) index = i;
         }
+        sections.current.forEach((section, roomIndex) => {
+          if (!section) return;
+          const relative = (y - section.offsetTop) / section.offsetHeight;
+          const fade = Math.max(0, Math.min(1, (relative - 0.32) / 0.33));
+          const entering = Math.max(
+            0,
+            Math.min(
+              1,
+              1 -
+                (section.offsetTop - y) /
+                  (innerHeight * (roomIndex === 6 ? 0.15 : 0.45)),
+            ),
+          );
+          const entryOpacity = entering * entering * (3 - 2 * entering);
+          section.style.setProperty(
+            "--copy-opacity",
+            String((1 - fade * fade * (3 - 2 * fade)) * entryOpacity),
+          );
+        });
         const element = sections.current[index];
         const fraction = element
           ? Math.min(
@@ -382,8 +401,15 @@ export default function Experience() {
                       </Button>
                     ))}
                   </div>
-                  <Button onClick={download}>
-                    Keep a little elsewhere <Download size={17} />
+                  <Button
+                    onClick={download}
+                    aria-label="Download your postcard"
+                  >
+                    <span className="postcard-label">
+                      Keep a little elsewhere
+                    </span>
+                    <span className="postcard-short">Save</span>
+                    <Download size={17} />
                   </Button>
                 </div>
               )}

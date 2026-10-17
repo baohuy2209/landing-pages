@@ -63,6 +63,10 @@ svg {
   display: block;
   width: 100%;
   height: 100%;
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: pan-y pinch-zoom;
 }
 .header {
   position: absolute;
@@ -601,7 +605,7 @@ footer {
     max-width: 340px;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1024px) and (orientation: portrait) {
   .header {
     padding: 22px 6%;
   }
@@ -649,8 +653,7 @@ footer {
     min-height: 42px;
   }
   .world {
-    top: 38%;
-    height: 62%;
+    inset: 0;
   }
   .side-index {
     right: 12px;
@@ -758,7 +761,7 @@ footer {
   pointer-events: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1024px) and (orientation: portrait) {
   .toolbar {
     width: 310px;
     justify-content: space-between;
@@ -791,5 +794,206 @@ footer {
   .motion-toggle {
     width: 44px;
     min-height: 44px;
+  }
+}
+
+.model-interaction {
+  position: absolute;
+  z-index: 1;
+  right: 25%;
+  bottom: 138px;
+  transform: translateX(50%);
+  pointer-events: auto;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 30px;
+  color: var(--ink);
+  background: #f2eee5ba;
+  backdrop-filter: blur(12px);
+  border: 1px solid #ffffff70;
+  font-size: 10px;
+  transition:
+    background 0.3s,
+    box-shadow 0.3s,
+    opacity 0.3s;
+}
+.model-interaction:hover,
+.world[data-hovered="true"] .model-interaction {
+  background: #f2eee5;
+  box-shadow: 0 3px 20px #34392e18;
+}
+.model-interaction svg {
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.world[data-hovered="true"] .model-interaction svg {
+  transform: rotate(-18deg);
+}
+.world[data-turned="true"] .model-interaction svg {
+  transform: rotate(35deg);
+}
+.touch-hint {
+  display: none;
+}
+@media (hover: none) {
+  .pointer-hint {
+    display: none;
+  }
+  .touch-hint {
+    display: inline;
+  }
+}
+@media (max-width: 760px), (max-width: 1024px) and (orientation: portrait) {
+  .model-interaction {
+    right: 50%;
+    bottom: 112px;
+    min-height: 44px;
+    font-size: 9px;
+  }
+  .pointer-hint {
+    display: none;
+  }
+  .touch-hint {
+    display: inline;
+  }
+}
+
+.room-sticky {
+  opacity: var(--copy-opacity, 1);
+}
+.world[data-transitioning="true"] .model-interaction {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.room {
+  color: var(--ink);
+}
+.room-6 {
+  color: #f0e8d9;
+}
+
+.postcard-short {
+  display: none;
+}
+@media (max-width: 760px), (max-width: 1024px) and (orientation: portrait) {
+  .souvenir {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .palette {
+    gap: 4px;
+    margin: 0;
+  }
+  .swatch {
+    font-size: 0;
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .swatch i {
+    width: 20px;
+    height: 20px;
+  }
+  .postcard-label {
+    display: none;
+  }
+  .postcard-short {
+    display: inline;
+  }
+  .souvenir > .button {
+    gap: 10px;
+    min-height: 44px;
+  }
+}
+@media (max-width: 760px) and (max-height: 740px) {
+  .room-sticky {
+    padding-top: 105px;
+  }
+  h1,
+  h2,
+  .room-4 h2 {
+    font-size: 44px;
+    margin-bottom: 14px;
+  }
+  .eyebrow {
+    margin-bottom: 13px;
+  }
+  .room-description {
+    font-size: 11px;
+    line-height: 1.65;
+    max-width: 290px;
+    margin-bottom: 12px;
+  }
+}
+
+@media (min-width: 761px) and (max-height: 560px) {
+  .header {
+    padding-top: 15px;
+  }
+  .header-caption {
+    display: none;
+  }
+  .wordmark {
+    font-size: 25px;
+  }
+  .room-sticky {
+    padding: 80px 6% 75px;
+    align-items: flex-start;
+  }
+  h1,
+  h2 {
+    font-size: 44px;
+    margin-bottom: 14px;
+  }
+  .eyebrow {
+    margin-bottom: 12px;
+    font-size: 7px;
+  }
+  .room-description {
+    font-size: 11px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .room-copy > .button {
+    min-height: 44px;
+    padding: 9px 15px;
+    font-size: 11px;
+  }
+  .room-bottom,
+  .side-index {
+    display: none;
+  }
+  .toolbar {
+    bottom: 10px;
+  }
+  .model-interaction {
+    bottom: 80px;
+    font-size: 9px;
+  }
+  .souvenir {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .palette {
+    margin: 0;
+    gap: 3px;
+  }
+  .swatch {
+    width: 44px;
+    font-size: 0;
+    justify-content: center;
+  }
+  .swatch i {
+    width: 18px;
+    height: 18px;
+  }
+  .postcard-label {
+    display: none;
+  }
+  .postcard-short {
+    display: inline;
   }
 }

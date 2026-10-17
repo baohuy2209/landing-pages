@@ -1,5 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
+import { Rotate3D } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { chapterBlend, springStep } from "@/lib/motion";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
@@ -12,6 +15,8 @@ type Props = {
 };
 export default function World({ progress, paused, palette, onReady }: Props) {
   const host = useRef<HTMLDivElement>(null);
+  const control = useRef<HTMLButtonElement>(null);
+  const interact = useRef<() => void>(() => {});
   const state = useRef({ paused, palette });
   useEffect(() => {
     state.current = { paused, palette };
@@ -34,7 +39,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       frame = 0,
       elapsed = 0,
       previous = performance.now(),
-      current = 0;
+      current = progress.current;
     const scene = new THREE.Scene();
     const backgrounds = [
       "#e9e5db",
@@ -47,7 +52,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       "#e8e2d3",
     ].map((c) => new THREE.Color(c));
     scene.background = backgrounds[0].clone();
-    scene.fog = new THREE.Fog(backgrounds[0], 35, 100);
+    scene.fog = new THREE.Fog(backgrounds[0], 65, 140);
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 180);
     renderer.setPixelRatio(
       Math.min(window.devicePixelRatio, window.innerWidth < 768 ? 1.5 : 1.8),
@@ -62,7 +67,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     const pmrem = new THREE.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(environmentScene, 0.04);
     scene.environment = environment.texture;
-    scene.environmentIntensity = 0.28;
+    scene.environmentIntensity = 0.35;
     environmentScene.dispose();
     pmrem.dispose();
     container.appendChild(renderer.domElement);
@@ -72,14 +77,20 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     const sun = new THREE.DirectionalLight(0xfff0d9, 4.1);
     sun.position.set(-9, 15, 8);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -15;
-    sun.shadow.camera.right = 15;
-    sun.shadow.camera.top = 15;
-    sun.shadow.camera.bottom = -15;
+    const compact = window.matchMedia(
+      "(max-width: 760px), (max-width: 1024px) and (orientation: portrait)",
+    );
+    sun.shadow.mapSize.set(
+      compact.matches ? 1024 : 2048,
+      compact.matches ? 1024 : 2048,
+    );
+    sun.shadow.camera.left = -10;
+    sun.shadow.camera.right = 10;
+    sun.shadow.camera.top = 10;
+    sun.shadow.camera.bottom = -10;
     sun.shadow.camera.near = 0.5;
     sun.shadow.camera.far = 65;
-    sun.shadow.normalBias = 0.045;
+    sun.shadow.normalBias = 0.025;
     sun.shadow.bias = -0.0001;
     sun.shadow.radius = 4;
     scene.add(sun, sun.target);
@@ -106,7 +117,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
         color,
         roughness,
         bumpMap: grain,
-        bumpScale: 0.022,
+        bumpScale: 0.012,
       });
     const clay = mat("#bf7357"),
       chalk = mat("#ede6d5"),
@@ -117,7 +128,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       sand = mat("#c9b791");
     const brass = new THREE.MeshStandardMaterial({
       color: "#c5a671",
-      roughness: 0.3,
+      roughness: 0.24,
       metalness: 0.65,
     });
     const water = new THREE.MeshPhysicalMaterial({
@@ -162,7 +173,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
           w,
           h,
           d,
-          3,
+          4,
           Math.min(r, w / 4, h / 4, d / 4),
         );
         boxGeo.set(key, geometry);
@@ -202,8 +213,8 @@ export default function World({ progress, paused, palette, onReady }: Props) {
           bevelEnabled: true,
           bevelThickness: 0.045,
           bevelSize: 0.045,
-          bevelSegments: 3,
-          curveSegments: 48,
+          bevelSegments: 5,
+          curveSegments: 64,
           steps: 1,
         });
         geometry.translate(0, 0, -0.3);
@@ -218,6 +229,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       parent.add(mesh);
       return mesh;
     }
+    const cylinderGeometries = new Map<string, THREE.LatheGeometry>();
     function cylinder(
       parent: THREE.Object3D,
       r: number,
@@ -227,7 +239,38 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       z: number,
       m: THREE.Material = chalk,
     ) {
-      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 48), m);
+      const key = `${r},${h}`;
+      let geometry = cylinderGeometries.get(key);
+      if (!geometry) {
+        const bevel = Math.min(0.035, r * 0.14, h * 0.1);
+        const profile = [
+          new THREE.Vector2(0, -h / 2),
+          new THREE.Vector2(r - bevel, -h / 2),
+        ];
+        for (let i = 1; i <= 6; i++) {
+          const a = ((i / 6) * Math.PI) / 2;
+          profile.push(
+            new THREE.Vector2(
+              r - bevel + Math.sin(a) * bevel,
+              -h / 2 + bevel - Math.cos(a) * bevel,
+            ),
+          );
+        }
+        profile.push(new THREE.Vector2(r, h / 2 - bevel));
+        for (let i = 1; i <= 6; i++) {
+          const a = ((i / 6) * Math.PI) / 2;
+          profile.push(
+            new THREE.Vector2(
+              r - bevel + Math.cos(a) * bevel,
+              h / 2 - bevel + Math.sin(a) * bevel,
+            ),
+          );
+        }
+        profile.push(new THREE.Vector2(0, h / 2));
+        geometry = new THREE.LatheGeometry(profile, 64);
+        cylinderGeometries.set(key, geometry);
+      }
+      const mesh = new THREE.Mesh(geometry, m);
       mesh.position.set(x, y, z);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -261,8 +304,8 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       return group;
     }
     function plinth(parent: THREE.Group, m = chalk) {
-      box(parent, 10, 0.5, 9, 0, -0.3, 0, m, 0.2);
-      box(parent, 10.8, 0.25, 9.8, 0, -0.67, 0, sand, 0.1);
+      box(parent, 10, 0.5, 9, 0, -0.3, 0, m, 0.2).userData.base = true;
+      box(parent, 10.8, 0.25, 9.8, 0, -0.67, 0, sand, 0.1).userData.base = true;
     }
     const rooms: THREE.Group[] = [];
     for (let i = 0; i < 8; i++) {
@@ -297,8 +340,8 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     // 02 — a deep rhythm of connected portals, each opening genuinely modelled.
     for (let j = 0; j < 6; j++) {
       arch(rooms[1], 0, 0, 2.8 - j * 1.2, j % 2 ? chalk : clay, 0.86);
-      box(rooms[1], 0.8, 0.3, 7, -2.3, 0.1, -0.3, clay);
     }
+    box(rooms[1], 0.8, 0.3, 7, -2.3, 0.1, -0.3, clay);
     box(rooms[1], 1.5, 0.035, 7, 0, 0.025, -0.3, blue, 0.005);
     // 03 — folded staircases rising around a quiet solid core.
     const stair = rooms[2];
@@ -306,6 +349,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     steps(stair, 14, -2, 2, chalk);
     const landing = steps(stair, 10, 2, -3, lilac, Math.PI);
     landing.position.y = 2.7;
+    box(stair, 2, 2.7, 4.4, 2, 1.35, -1.2, lilac);
     box(stair, 4.1, 0.3, 2, -0.8, 3.5, -3.8, chalk);
     box(stair, 3, 0.3, 2, 1.6, 5.3, 0.8, lilac);
     arch(stair, 2, 5.45, 0.8, blue, 0.48);
@@ -404,100 +448,364 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     cylinder(roofWorld, 0.75, 2.8, 3, 1.4, 2, sage);
     box(roofWorld, 3, 0.15, 2, -2, 0.1, 2, water);
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(260, 120),
+      new THREE.PlaneGeometry(1200, 1200),
       new THREE.MeshStandardMaterial({ color: "#e4dfd3", roughness: 1 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(80, -0.82, 0);
     floor.receiveShadow = true;
     scene.add(floor);
-    const pointer = { x: 0, y: 0 };
-    const onPointer = (e: PointerEvent) => {
-      pointer.x = (e.clientX / window.innerWidth - 0.5) * 2;
-      pointer.y = (e.clientY / window.innerHeight - 0.5) * 2;
-    };
-    const resize = () => {
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-    };
-    window.addEventListener("resize", resize);
-    window.addEventListener("pointermove", onPointer, { passive: true });
-    resize();
+    // Composite complete, opaque studies instead of hiding visible geometry.
+    // Each study keeps its own depth buffer and shadows throughout the dissolve.
+    const makeTarget = () =>
+      new THREE.WebGLRenderTarget(1, 1, {
+        type: THREE.HalfFloatType,
+        samples: Math.min(
+          compact.matches ? 2 : 4,
+          renderer.capabilities.maxSamples,
+        ),
+      });
+    const outgoing = makeTarget(),
+      incoming = makeTarget();
+    const composite = new THREE.ShaderMaterial({
+      uniforms: {
+        from: { value: outgoing.texture },
+        to: { value: incoming.texture },
+        blend: { value: 0 },
+      },
+      depthTest: false,
+      depthWrite: false,
+      vertexShader: `varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+      fragmentShader: `uniform sampler2D from;
+        uniform sampler2D to;
+        uniform float blend;
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = mix(texture2D(from, vUv), texture2D(to, vUv), blend);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    });
+    const screen = new THREE.Scene();
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), composite);
+    screen.add(quad);
+    const screenCamera = new THREE.Camera();
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const smooth = (v: number) => {
-      v = THREE.MathUtils.clamp(v, 0, 1);
-      return v * v * (3 - 2 * v);
+    const pointer = new THREE.Vector2(0, 0),
+      softenedPointer = new THREE.Vector2();
+    const raycaster = new THREE.Raycaster();
+    const turn = rooms.map(() => ({
+      value: 0,
+      velocity: 0,
+      target: 0,
+      taps: 0,
+    }));
+    const pulses = rooms.map(() => 10);
+    let hovered = false,
+      pointerInside = false,
+      displayed = 0,
+      blend = 0;
+    let pressed: {
+      x: number;
+      y: number;
+      scroll: number;
+      id: number;
+      touch: boolean;
+      rotation: number;
+      moved: boolean;
+    } | null = null;
+    let viewWidth = 1,
+      viewHeight = 1,
+      mobile = compact.matches;
+    const target = new THREE.Vector3();
+    const floorMaterial = floor.material as THREE.MeshStandardMaterial;
+    const rippleMaterial = new THREE.MeshBasicMaterial({
+      color: "#d3f3d7",
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const ripples = Array.from({ length: 3 }, () => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.96, 1, 80),
+        rippleMaterial.clone(),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(0, 0.358, 0);
+      ring.visible = false;
+      court.add(ring);
+      return ring;
+    });
+    const resize = () => {
+      viewWidth = container.clientWidth;
+      viewHeight = container.clientHeight;
+      mobile = compact.matches;
+      renderer.setPixelRatio(
+        Math.min(
+          window.devicePixelRatio,
+          1.5,
+          Math.sqrt(
+            (mobile ? 1_000_000 : 2_000_000) / (viewWidth * viewHeight),
+          ),
+        ),
+      );
+      renderer.setSize(viewWidth, viewHeight);
+      const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+      outgoing.setSize(size.x, size.y);
+      incoming.setSize(size.x, size.y);
+      camera.aspect = viewWidth / viewHeight;
+      camera.clearViewOffset();
+      // A full-height canvas avoids the visible background seam on phones.
+      if (mobile)
+        camera.setViewOffset(
+          viewWidth,
+          viewHeight,
+          0,
+          -viewHeight * (viewHeight < 740 ? 0.2 : 0.22),
+          viewWidth,
+          viewHeight,
+        );
+      camera.updateProjectionMatrix();
     };
-    const target = new THREE.Vector3(),
-      cameraPosition = new THREE.Vector3();
-    const background = new THREE.Color();
+    const cameraFor = (index: number, slide = 0) => {
+      const x = index * 23;
+      const distance = mobile
+        ? Math.max(
+            29,
+            (viewHeight < 740 ? 16.2 : 14.2) /
+              (2 * Math.tan(THREE.MathUtils.degToRad(19)) * camera.aspect),
+          )
+        : Math.max(
+            viewHeight < 560 ? 28 : 23.5,
+            20 / (2 * Math.tan(THREE.MathUtils.degToRad(19)) * camera.aspect),
+          );
+      const angle =
+        0.38 + Math.sin(current * 0.55) * 0.08 + softenedPointer.x * 0.07;
+      const offset = mobile ? 0 : 4.3;
+      const lookHeight =
+        !mobile && viewHeight < 560
+          ? 1.2
+          : index === 2 || index === 5
+            ? 2.65
+            : 2.1;
+      target.set(x - offset + slide, lookHeight, 0);
+      camera.position.set(
+        x + Math.sin(angle) * distance - offset + slide,
+        distance * (index === 4 ? 0.63 : 0.47) + softenedPointer.y * 0.3,
+        Math.cos(angle) * distance,
+      );
+      camera.lookAt(target);
+      camera.updateMatrixWorld();
+    };
+    const pointFrom = (e: PointerEvent) => {
+      const bounds = container.getBoundingClientRect();
+      pointer.set(
+        ((e.clientX - bounds.left) / bounds.width) * 2 - 1,
+        1 - ((e.clientY - bounds.top) / bounds.height) * 2,
+      );
+    };
+    const hitModel = () => {
+      // Ignore barely visible models during a transition and never intercept a scroll.
+      if (blend > 0.12 && blend < 0.88) return false;
+      cameraFor(displayed);
+      rooms[displayed].updateWorldMatrix(true, true);
+      raycaster.setFromCamera(pointer, camera);
+      return raycaster
+        .intersectObjects(rooms[displayed].children, true)
+        .some(
+          (hit) =>
+            !hit.object.userData.base &&
+            !ripples.includes(hit.object as (typeof ripples)[number]),
+        );
+    };
+    const activate = () => {
+      if (blend > 0.12 && blend < 0.88) return;
+      const rotation = turn[displayed];
+      rotation.taps += 1;
+      rotation.target = [0, -0.55, 0.42][rotation.taps % 3];
+      pulses[displayed] = 0;
+      container.dataset.turned = String(rotation.taps % 3 !== 0);
+    };
+    interact.current = activate;
+    const onPointer = (e: PointerEvent) => {
+      pointFrom(e);
+      if (pressed) {
+        const dx = e.clientX - pressed.x,
+          dy = e.clientY - pressed.y;
+        if (Math.hypot(dx, dy) > 8) pressed.moved = true;
+        if (!pressed.touch && pressed.moved) {
+          turn[pressed.id].target = THREE.MathUtils.clamp(
+            pressed.rotation + dx * 0.004,
+            -0.8,
+            0.8,
+          );
+        }
+      }
+      pointerInside = e.pointerType !== "touch";
+      hovered = pointerInside && hitModel();
+      container.dataset.hovered = String(hovered);
+      renderer.domElement.style.cursor =
+        pressed && !pressed.touch ? "grabbing" : hovered ? "grab" : "auto";
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.target !== renderer.domElement || e.button !== 0) return;
+      pointFrom(e);
+      if (!hitModel()) return;
+      pressed = {
+        x: e.clientX,
+        y: e.clientY,
+        scroll: scrollY,
+        id: displayed,
+        touch: e.pointerType === "touch",
+        rotation: turn[displayed].target,
+        moved: false,
+      };
+      if (!pressed.touch) renderer.domElement.setPointerCapture(e.pointerId);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!pressed) return;
+      const tap =
+        !pressed.moved &&
+        Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) < 8 &&
+        Math.abs(scrollY - pressed.scroll) < 8 &&
+        pressed.id === displayed;
+      pressed = null;
+      if (tap) activate();
+      if (renderer.domElement.hasPointerCapture(e.pointerId))
+        renderer.domElement.releasePointerCapture(e.pointerId);
+      renderer.domElement.style.cursor = hovered ? "grab" : "auto";
+    };
+    const onLeave = () => {
+      pointerInside = false;
+      hovered = false;
+      container.dataset.hovered = "false";
+    };
+    const onCancel = () => {
+      pressed = null;
+      onLeave();
+    };
+    const onVisibility = () => {
+      cancelAnimationFrame(frame);
+      previous = performance.now();
+      if (!document.hidden && !disposed) frame = requestAnimationFrame(render);
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(container);
+    container.addEventListener("pointermove", onPointer, { passive: true });
+    container.addEventListener("pointerdown", onDown, { passive: true });
+    container.addEventListener("pointerleave", onLeave);
+    container.addEventListener("pointercancel", onCancel);
+    window.addEventListener("pointerup", onUp, { passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
+    resize();
     let lastPalette = -1;
+    const clayTarget = clay.color.clone(),
+      blueTarget = blue.color.clone();
+    function drawStudy(
+      index: number,
+      slide: number,
+      output: THREE.WebGLRenderTarget,
+    ) {
+      const x = index * 23;
+      rooms.forEach((room, i) => {
+        room.visible = i === index;
+      });
+      cameraFor(index, reduced.matches ? 0 : slide);
+      (scene.background as THREE.Color).copy(backgrounds[index]);
+      (scene.fog as THREE.Fog).color.copy(backgrounds[index]);
+      floorMaterial.color.copy(backgrounds[index]);
+      const lightTurn = turn[index].value * 0.8;
+      sun.position.set(
+        x - 9 + Math.sin(lightTurn) * 6,
+        15,
+        8 + Math.sin(lightTurn) * 4,
+      );
+      sun.target.position.set(x, 0, 0);
+      hemi.intensity = index === 6 ? 1 : 1.8;
+      sun.intensity = index === 6 ? 1.9 : 3.2;
+      renderer.setRenderTarget(output);
+      renderer.render(scene, camera);
+    }
     function render(now: number) {
-      if (disposed) return;
-      const dt = THREE.MathUtils.clamp((now - previous) / 1000, 0, 0.05);
+      if (disposed || document.hidden) return;
+      const dt = THREE.MathUtils.clamp((now - previous) / 1000, 0, 0.04);
       previous = now;
-      const active = !state.current.paused && !reduced.matches;
-      if (active) elapsed += dt;
+      const ambient = !state.current.paused && !reduced.matches;
+      if (ambient) elapsed += dt;
       current = THREE.MathUtils.damp(
         current,
         progress.current,
-        reduced.matches ? 100 : 9,
+        reduced.matches ? 100 : 10,
         dt,
       );
-      if (Math.abs(current - progress.current) < 0.0005)
-        current = progress.current;
-      const section = THREE.MathUtils.clamp(Math.floor(current), 0, 7);
-      const local = current - section;
-      const travel = section === 7 ? 0 : smooth((local - 0.58) / 0.42);
-      const worldX = (section + travel) * 23;
-      const mobile = container.clientWidth < 760;
-      const angle =
-        0.38 +
-        Math.sin(current * 0.55) * 0.14 +
-        Math.sin(local * Math.PI) * 0.12 +
-        (active ? pointer.x * 0.018 : 0);
-      const distance = mobile ? 27 : 19;
-      const cameraHeight =
-        THREE.MathUtils.lerp(
-          section === 4 ? 13 : 9,
-          section + 1 === 4 ? 13 : 9,
-          travel,
-        ) + (mobile ? 2 : 0);
-      target.set(worldX - (mobile ? 0 : 2.7), mobile ? 2.2 : 2.1, 0);
-      cameraPosition.set(
-        worldX + Math.sin(angle) * distance - (mobile ? 0 : 2.7),
-        cameraHeight + (active ? pointer.y * 0.15 : 0),
-        Math.cos(angle) * distance,
+      const phase = chapterBlend(current);
+      blend = phase.mix;
+      displayed = blend < 0.5 ? phase.from : phase.to;
+      const transitioning = blend > 0.12 && blend < 0.88;
+      if (control.current) control.current.disabled = transitioning;
+      container.dataset.transitioning = String(transitioning);
+      const canFollow = ambient && pointerInside && hovered && !pressed;
+      softenedPointer.x = THREE.MathUtils.damp(
+        softenedPointer.x,
+        canFollow ? pointer.x : 0,
+        5,
+        dt,
       );
-      camera.position.copy(cameraPosition);
-      camera.lookAt(target);
-      const bg = background
-        .copy(backgrounds[section])
-        .lerp(backgrounds[Math.min(7, section + 1)], travel);
-      (scene.background as THREE.Color).copy(bg);
-      (scene.fog as THREE.Fog).color.copy(bg);
-      (floor.material as THREE.MeshStandardMaterial).color.copy(bg);
-      sun.position.set(worldX - 9, 15, 8);
-      sun.target.position.set(worldX, 0, 0);
-      const darkness = section === 6 ? 1 - travel : section === 5 ? travel : 0;
-      hemi.intensity = 2.8 - darkness * 1.8;
-      sun.intensity = 4.1 - darkness * 2.2;
-      rooms.forEach((room, i) => {
-        room.visible =
-          (i === section && travel < 0.99) ||
-          (travel > 0.005 && i === section + 1);
-      });
+      softenedPointer.y = THREE.MathUtils.damp(
+        softenedPointer.y,
+        canFollow ? pointer.y : 0,
+        5,
+        dt,
+      );
+      for (let i = 0; i < rooms.length; i++) {
+        if (reduced.matches) {
+          turn[i].value = turn[i].target;
+          turn[i].velocity = 0;
+        } else springStep(turn[i], dt);
+        rooms[i].rotation.y = turn[i].value;
+        pulses[i] += dt;
+      }
+      const pulse = (i: number, delay = 0) => {
+        const t = pulses[i] - delay;
+        return t < 0 || t > 2.4 || reduced.matches
+          ? 0
+          : Math.sin(t * 5) ** 2 * Math.exp(-t * 2.4);
+      };
+      orb.position.y = 1.85 + pulse(0) * 0.6;
       floating.forEach((b, i) => {
-        b.position.y = 0.4 + i * 0.65 + Math.sin(elapsed * 0.55 + i) * 0.07;
+        b.position.y =
+          0.4 +
+          i * 0.65 +
+          Math.sin(elapsed * 0.55 + i) * 0.055 +
+          pulse(5, i * 0.08) * 0.22;
       });
-      water.roughness = 0.15 + Math.sin(elapsed * 0.4) * 0.025;
+      ripples.forEach((ring, i) => {
+        const t = (pulses[3] - i * 0.18) / 1.4;
+        ring.visible = !reduced.matches && t > 0 && t < 1;
+        ring.scale.setScalar(0.1 + THREE.MathUtils.clamp(t, 0, 1) * 1.5);
+        (ring.material as THREE.MeshBasicMaterial).opacity =
+          Math.sin(Math.max(0, Math.min(1, t)) * Math.PI) * 0.45;
+      });
+      water.roughness = 0.15 + Math.sin(elapsed * 0.4) * 0.02;
+      lamp.emissiveIntensity = 2 + pulse(6) * 2;
       if (lastPalette !== state.current.palette) {
         lastPalette = state.current.palette;
-        clay.color.set(["#bf7357", "#bb927c", "#cd965c"][lastPalette]);
-        blue.color.set(["#455c96", "#716d8e", "#427e79"][lastPalette]);
+        clayTarget.set(["#bf7357", "#bb927c", "#cd965c"][lastPalette]);
+        blueTarget.set(["#455c96", "#716d8e", "#427e79"][lastPalette]);
       }
-      renderer.render(scene, camera);
+      clay.color.lerp(clayTarget, reduced.matches ? 1 : 1 - Math.exp(-5 * dt));
+      blue.color.lerp(blueTarget, reduced.matches ? 1 : 1 - Math.exp(-5 * dt));
+      // Invisible studies can be culled safely: their contribution is exactly zero.
+      drawStudy(phase.from, phase.mix * 1.3, outgoing);
+      if (phase.mix > 0) drawStudy(phase.to, -(1 - phase.mix) * 1.3, incoming);
+      composite.uniforms.to.value =
+        phase.mix > 0 ? incoming.texture : outgoing.texture;
+      composite.uniforms.blend.value = phase.mix;
+      renderer.setRenderTarget(null);
+      renderer.render(screen, screenCamera);
+      cameraFor(displayed);
       frame = requestAnimationFrame(render);
     }
     const contextLost = (e: Event) => {
@@ -518,8 +826,14 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
-      window.removeEventListener("resize", resize);
-      window.removeEventListener("pointermove", onPointer);
+      observer.disconnect();
+      container.removeEventListener("pointermove", onPointer);
+      container.removeEventListener("pointerdown", onDown);
+      container.removeEventListener("pointerleave", onLeave);
+      container.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("pointerup", onUp);
+      document.removeEventListener("visibilitychange", onVisibility);
+      interact.current = () => {};
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       const geometries = new Set<THREE.BufferGeometry>();
       scene.traverse((o) => {
@@ -528,11 +842,31 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       (floor.material as THREE.Material).dispose();
+      ripples.forEach((r) => r.material.dispose());
+      rippleMaterial.dispose();
+      outgoing.dispose();
+      incoming.dispose();
+      composite.dispose();
+      quad.geometry.dispose();
       grain.dispose();
       environment.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
   }, [onReady, progress]);
-  return <div className="world" ref={host} />;
+  return (
+    <div className="world" ref={host}>
+      <Button
+        ref={control}
+        variant="unstyled"
+        className="model-interaction"
+        onClick={() => interact.current()}
+        aria-label="Turn the architectural model"
+      >
+        <Rotate3D size={16} />
+        <span className="pointer-hint">Drag to explore · click to turn</span>
+        <span className="touch-hint">Touch to turn</span>
+      </Button>
+    </div>
+  );
 }
