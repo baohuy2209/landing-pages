@@ -9,6 +9,8 @@ Built with Next.js, Tailwind CSS and fully customized shadcn/ui.
 
 | Preview | Project | Concept |
 | --- | --- | --- |
+| [![Tessera](www/showcase/tessera.jpg)](https://tessera-lndev.vercel.app) | **[Tessera](landing-pages/tessera)** · [Live](https://tessera-lndev.vercel.app) | Eight-room architectural 3D promenade |
+| [![Oddpress](www/showcase/oddpress.jpg)](https://oddpress-lndev.vercel.app) | **[Oddpress](landing-pages/oddpress)** · [Live](https://oddpress-lndev.vercel.app) | Independent print club with a live ink lab |
 | [![Fallow](www/showcase/fallow.jpg)](https://fallow-lndev.vercel.app) | **[Fallow](landing-pages/fallow)** · [Live](https://fallow-lndev.vercel.app) | Interactive 3D botanical story |
 | [![Offcut](www/showcase/offcut.jpg)](https://offcut-lndev.vercel.app) | **[Offcut](landing-pages/offcut)** · [Live](https://offcut-lndev.vercel.app) | Furniture atelier with 3D objects |
 | [![Crux](www/showcase/crux.jpg)](https://crux-lndev.vercel.app) | **[Crux](landing-pages/crux)** · [Live](https://crux-lndev.vercel.app) | Independent bouldering club |

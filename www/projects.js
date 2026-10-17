@@ -1,6 +1,38 @@
 /* Live previews follow https://[slug]-lndev.vercel.app. */
 window.PROJECTS = [
   {
+    slug: "tessera",
+    name: "Tessera",
+    category: "An imaginary architectural atlas",
+    direction: "Spaces for the wandering mind",
+    group: "immersive",
+    description:
+      "Eight original architectural studies connected by a continuous 3D promenade. Follow the light, explore impossible spaces and keep an illustrated postcard.",
+    short: "Eight impossible spaces. One wandering mind.",
+    type: "Syne, Manrope",
+    signature: "Eight WebGL chambers, native scroll and a personal postcard",
+    colors: ["#E9E5DB", "#BF7357", "#455C96", "#34392E"],
+    stack: ["Next.js 16", "Tailwind CSS 4", "shadcn/ui", "Three.js"],
+    image: "showcase/tessera.jpg",
+    url: "https://tessera-lndev.vercel.app",
+  },
+  {
+    slug: "oddpress",
+    name: "Oddpress",
+    category: "Independent print club",
+    direction: "Perfectly off-register",
+    group: "playful",
+    description:
+      "A paper playground with original posters, expressive typography and an interactive ink lab. Layer two colours, embrace misregistration and download your own print.",
+    short: "A little ink. A happy accident.",
+    type: "Dela Gothic One, Manrope",
+    signature: "Original SVG posters and a two-ink print lab",
+    colors: ["#F7F1D7", "#DB422E", "#493264", "#3345BB"],
+    stack: ["Next.js 16", "Tailwind CSS 4", "shadcn/ui", "SVG"],
+    image: "showcase/oddpress.jpg",
+    url: "https://oddpress-lndev.vercel.app",
+  },
+  {
     slug: "fallow",
     image: "showcase/fallow.jpg",
     name: "Fallow",
