@@ -7,19 +7,19 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm test` checks chapter continuity and the interaction springs. `pnpm typecheck` checks TypeScript. `pnpm build` creates the production build; `pnpm start` serves it.
+`pnpm test` checks chapter continuity and the sphere’s flight cycle. `pnpm typecheck` checks TypeScript. `pnpm build` creates the production build; `pnpm start` serves it.
 
 ## The experience
 
-A threshold, passage, ascent, courtyard, light room, suspended gallery, blue hour and souvenir. Scroll changes the camera and light across roughly thirteen viewport-heights. Complete scenes dissolve into one another, with continuous camera motion and independent shadows. The atlas and chapter controls also navigate the story. The last chapter offers three palettes and an original SVG postcard download.
+A threshold, passage, ascent, courtyard, light room, suspended gallery, blue hour and souvenir. Scroll changes the camera and light across roughly thirteen viewport-heights. Complete maquettes slide horizontally between chapters, keeping opaque geometry and independent contact shadows over a gradually changing backdrop. The atlas and chapter controls also navigate the story. The last chapter offers three palettes and an original SVG postcard download.
 
-The loader waits for local fonts and the first compiled WebGL frame. On unsupported WebGL or context loss, a CSS illustration preserves the reading experience. Ambient motion can be paused; native scrolling remains active. Reduced-motion preferences disable ambient movement and smooth navigation. Mobile uses a separate camera framing, capped pixel ratio and smaller shadow maps. Hover gently shifts the viewpoint; drag a model to inspect it, or click/tap to turn it. The gold sphere, pool, floating landings and lanterns add small responses. A keyboard-accessible control offers the same interaction, and touch gestures preserve native scrolling.
+The loader waits for local fonts and the first compiled WebGL frame. On unsupported WebGL or context loss, a CSS illustration preserves the reading experience. Ambient motion can be paused; native scrolling remains active. Reduced-motion preferences disable ambient movement and smooth navigation. Mobile uses a separate camera framing, capped pixel ratio and smaller shadow maps. The gold sphere gently takes flight and returns to its pedestal; pool ripples, suspended landings and lanterns animate autonomously. The canvas never captures clicks, drags or touch gestures. Pausing freezes these details; reduced motion replaces lateral travel with a dissolve.
 
 ## Art direction & research
 
 - [Zero University](https://why.zero.university/) — spatial storytelling and minimal navigation within an immersive world.
 - [Awwwards Amsterdam, by NK Studio](https://www.nk.studio/work/awwwards-conf-amsterdam/) — architecture as a navigable narrative rather than decoration.
-- [Three.js Journey](https://threejs-journey.com/) — responsive, tactile 3D objects with playful pointer interaction.
+- [Three.js Journey](https://threejs-journey.com/) — playful miniature worlds and expressive animated details.
 - [Anime.js](https://animejs.com/) — deliberate staging, readable transitions and motion that explains structure.
 - [Aten7, by Immersive Garden](https://immersive-g.com/projects/aten7/) — a continuous journey with distinct atmospheres.
 

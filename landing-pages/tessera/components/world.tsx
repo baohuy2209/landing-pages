@@ -1,8 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { Rotate3D } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { chapterBlend, springStep } from "@/lib/motion";
+import { chapterBlend, sphereFlight } from "@/lib/motion";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
@@ -15,8 +13,6 @@ type Props = {
 };
 export default function World({ progress, paused, palette, onReady }: Props) {
   const host = useRef<HTMLDivElement>(null);
-  const control = useRef<HTMLButtonElement>(null);
-  const interact = useRef<() => void>(() => {});
   const state = useRef({ paused, palette });
   useEffect(() => {
     state.current = { paused, palette };
@@ -51,7 +47,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       "#222d42",
       "#e8e2d3",
     ].map((c) => new THREE.Color(c));
-    scene.background = backgrounds[0].clone();
+    renderer.setClearColor(0x000000, 0);
     scene.fog = new THREE.Fog(backgrounds[0], 65, 140);
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 180);
     renderer.setPixelRatio(
@@ -304,8 +300,8 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       return group;
     }
     function plinth(parent: THREE.Group, m = chalk) {
-      box(parent, 10, 0.5, 9, 0, -0.3, 0, m, 0.2).userData.base = true;
-      box(parent, 10.8, 0.25, 9.8, 0, -0.67, 0, sand, 0.1).userData.base = true;
+      box(parent, 10, 0.5, 9, 0, -0.3, 0, m, 0.2);
+      box(parent, 10.8, 0.25, 9.8, 0, -0.67, 0, sand, 0.1);
     }
     const rooms: THREE.Group[] = [];
     for (let i = 0; i < 8; i++) {
@@ -449,14 +445,14 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     box(roofWorld, 3, 0.15, 2, -2, 0.1, 2, water);
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(1200, 1200),
-      new THREE.MeshStandardMaterial({ color: "#e4dfd3", roughness: 1 }),
+      new THREE.ShadowMaterial({ color: "#34362e", opacity: 0.22 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(80, -0.82, 0);
     floor.receiveShadow = true;
     scene.add(floor);
-    // Composite complete, opaque studies instead of hiding visible geometry.
-    // Each study keeps its own depth buffer and shadows throughout the dissolve.
+    // Slide complete opaque studies and their contact shadows across a shared
+    // backdrop. Independent depth buffers avoid transparent, overlapping models.
     const makeTarget = () =>
       new THREE.WebGLRenderTarget(1, 1, {
         type: THREE.HalfFloatType,
@@ -472,6 +468,8 @@ export default function World({ progress, paused, palette, onReady }: Props) {
         from: { value: outgoing.texture },
         to: { value: incoming.texture },
         blend: { value: 0 },
+        background: { value: backgrounds[0].clone() },
+        reducedMotion: { value: false },
       },
       depthTest: false,
       depthWrite: false,
@@ -480,9 +478,26 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       fragmentShader: `uniform sampler2D from;
         uniform sampler2D to;
         uniform float blend;
+        uniform vec3 background;
+        uniform bool reducedMotion;
         varying vec2 vUv;
+        vec4 study(sampler2D image, vec2 uv) {
+          if (uv.x < 0.0 || uv.x > 1.0) return vec4(0.0);
+          return texture2D(image, uv);
+        }
         void main() {
-          gl_FragColor = mix(texture2D(from, vUv), texture2D(to, vUv), blend);
+          vec4 a = study(from, vUv + vec2(reducedMotion ? 0.0 : blend, 0.0));
+          vec4 b = study(to, vUv - vec2(reducedMotion ? 0.0 : 1.0 - blend, 0.0));
+          vec3 color;
+          if (reducedMotion) {
+            color = mix(a.rgb + background * (1.0 - a.a),
+                        b.rgb + background * (1.0 - b.a), blend);
+          } else {
+            // Render-target edges and shadows already carry premultiplied alpha.
+            color = a.rgb + background * (1.0 - a.a);
+            color = b.rgb + color * (1.0 - b.a);
+          }
+          gl_FragColor = vec4(color, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
@@ -492,34 +507,10 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     screen.add(quad);
     const screenCamera = new THREE.Camera();
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const pointer = new THREE.Vector2(0, 0),
-      softenedPointer = new THREE.Vector2();
-    const raycaster = new THREE.Raycaster();
-    const turn = rooms.map(() => ({
-      value: 0,
-      velocity: 0,
-      target: 0,
-      taps: 0,
-    }));
-    const pulses = rooms.map(() => 10);
-    let hovered = false,
-      pointerInside = false,
-      displayed = 0,
-      blend = 0;
-    let pressed: {
-      x: number;
-      y: number;
-      scroll: number;
-      id: number;
-      touch: boolean;
-      rotation: number;
-      moved: boolean;
-    } | null = null;
     let viewWidth = 1,
       viewHeight = 1,
       mobile = compact.matches;
     const target = new THREE.Vector3();
-    const floorMaterial = floor.material as THREE.MeshStandardMaterial;
     const rippleMaterial = new THREE.MeshBasicMaterial({
       color: "#d3f3d7",
       transparent: true,
@@ -569,7 +560,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
         );
       camera.updateProjectionMatrix();
     };
-    const cameraFor = (index: number, slide = 0) => {
+    const cameraFor = (index: number) => {
       const x = index * 23;
       const distance = mobile
         ? Math.max(
@@ -581,8 +572,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
             viewHeight < 560 ? 28 : 23.5,
             20 / (2 * Math.tan(THREE.MathUtils.degToRad(19)) * camera.aspect),
           );
-      const angle =
-        0.38 + Math.sin(current * 0.55) * 0.08 + softenedPointer.x * 0.07;
+      const angle = 0.38 + Math.sin(current * 0.55) * 0.08;
       const offset = mobile ? 0 : 4.3;
       const lookHeight =
         !mobile && viewHeight < 560
@@ -590,101 +580,14 @@ export default function World({ progress, paused, palette, onReady }: Props) {
           : index === 2 || index === 5
             ? 2.65
             : 2.1;
-      target.set(x - offset + slide, lookHeight, 0);
+      target.set(x - offset, lookHeight, 0);
       camera.position.set(
-        x + Math.sin(angle) * distance - offset + slide,
-        distance * (index === 4 ? 0.63 : 0.47) + softenedPointer.y * 0.3,
+        x + Math.sin(angle) * distance - offset,
+        distance * (index === 4 ? 0.63 : 0.47),
         Math.cos(angle) * distance,
       );
       camera.lookAt(target);
       camera.updateMatrixWorld();
-    };
-    const pointFrom = (e: PointerEvent) => {
-      const bounds = container.getBoundingClientRect();
-      pointer.set(
-        ((e.clientX - bounds.left) / bounds.width) * 2 - 1,
-        1 - ((e.clientY - bounds.top) / bounds.height) * 2,
-      );
-    };
-    const hitModel = () => {
-      // Ignore barely visible models during a transition and never intercept a scroll.
-      if (blend > 0.12 && blend < 0.88) return false;
-      cameraFor(displayed);
-      rooms[displayed].updateWorldMatrix(true, true);
-      raycaster.setFromCamera(pointer, camera);
-      return raycaster
-        .intersectObjects(rooms[displayed].children, true)
-        .some(
-          (hit) =>
-            !hit.object.userData.base &&
-            !ripples.includes(hit.object as (typeof ripples)[number]),
-        );
-    };
-    const activate = () => {
-      if (blend > 0.12 && blend < 0.88) return;
-      const rotation = turn[displayed];
-      rotation.taps += 1;
-      rotation.target = [0, -0.55, 0.42][rotation.taps % 3];
-      pulses[displayed] = 0;
-      container.dataset.turned = String(rotation.taps % 3 !== 0);
-    };
-    interact.current = activate;
-    const onPointer = (e: PointerEvent) => {
-      pointFrom(e);
-      if (pressed) {
-        const dx = e.clientX - pressed.x,
-          dy = e.clientY - pressed.y;
-        if (Math.hypot(dx, dy) > 8) pressed.moved = true;
-        if (!pressed.touch && pressed.moved) {
-          turn[pressed.id].target = THREE.MathUtils.clamp(
-            pressed.rotation + dx * 0.004,
-            -0.8,
-            0.8,
-          );
-        }
-      }
-      pointerInside = e.pointerType !== "touch";
-      hovered = pointerInside && hitModel();
-      container.dataset.hovered = String(hovered);
-      renderer.domElement.style.cursor =
-        pressed && !pressed.touch ? "grabbing" : hovered ? "grab" : "auto";
-    };
-    const onDown = (e: PointerEvent) => {
-      if (e.target !== renderer.domElement || e.button !== 0) return;
-      pointFrom(e);
-      if (!hitModel()) return;
-      pressed = {
-        x: e.clientX,
-        y: e.clientY,
-        scroll: scrollY,
-        id: displayed,
-        touch: e.pointerType === "touch",
-        rotation: turn[displayed].target,
-        moved: false,
-      };
-      if (!pressed.touch) renderer.domElement.setPointerCapture(e.pointerId);
-    };
-    const onUp = (e: PointerEvent) => {
-      if (!pressed) return;
-      const tap =
-        !pressed.moved &&
-        Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) < 8 &&
-        Math.abs(scrollY - pressed.scroll) < 8 &&
-        pressed.id === displayed;
-      pressed = null;
-      if (tap) activate();
-      if (renderer.domElement.hasPointerCapture(e.pointerId))
-        renderer.domElement.releasePointerCapture(e.pointerId);
-      renderer.domElement.style.cursor = hovered ? "grab" : "auto";
-    };
-    const onLeave = () => {
-      pointerInside = false;
-      hovered = false;
-      container.dataset.hovered = "false";
-    };
-    const onCancel = () => {
-      pressed = null;
-      onLeave();
     };
     const onVisibility = () => {
       cancelAnimationFrame(frame);
@@ -693,35 +596,20 @@ export default function World({ progress, paused, palette, onReady }: Props) {
     };
     const observer = new ResizeObserver(resize);
     observer.observe(container);
-    container.addEventListener("pointermove", onPointer, { passive: true });
-    container.addEventListener("pointerdown", onDown, { passive: true });
-    container.addEventListener("pointerleave", onLeave);
-    container.addEventListener("pointercancel", onCancel);
-    window.addEventListener("pointerup", onUp, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     resize();
     let lastPalette = -1;
     const clayTarget = clay.color.clone(),
       blueTarget = blue.color.clone();
-    function drawStudy(
-      index: number,
-      slide: number,
-      output: THREE.WebGLRenderTarget,
-    ) {
+    function drawStudy(index: number, output: THREE.WebGLRenderTarget) {
       const x = index * 23;
       rooms.forEach((room, i) => {
         room.visible = i === index;
       });
-      cameraFor(index, reduced.matches ? 0 : slide);
-      (scene.background as THREE.Color).copy(backgrounds[index]);
+      cameraFor(index);
       (scene.fog as THREE.Fog).color.copy(backgrounds[index]);
-      floorMaterial.color.copy(backgrounds[index]);
-      const lightTurn = turn[index].value * 0.8;
-      sun.position.set(
-        x - 9 + Math.sin(lightTurn) * 6,
-        15,
-        8 + Math.sin(lightTurn) * 4,
-      );
+      const lightDrift = index === 4 ? Math.sin(elapsed * 0.2) * 1.4 : 0;
+      sun.position.set(x - 9 + lightDrift, 15, 8);
       sun.target.position.set(x, 0, 0);
       hemi.intensity = index === 6 ? 1 : 1.8;
       sun.intensity = index === 6 ? 1.9 : 3.2;
@@ -741,55 +629,27 @@ export default function World({ progress, paused, palette, onReady }: Props) {
         dt,
       );
       const phase = chapterBlend(current);
-      blend = phase.mix;
-      displayed = blend < 0.5 ? phase.from : phase.to;
-      const transitioning = blend > 0.12 && blend < 0.88;
-      if (control.current) control.current.disabled = transitioning;
-      container.dataset.transitioning = String(transitioning);
-      const canFollow = ambient && pointerInside && hovered && !pressed;
-      softenedPointer.x = THREE.MathUtils.damp(
-        softenedPointer.x,
-        canFollow ? pointer.x : 0,
-        5,
-        dt,
+      const flight = reduced.matches ? 0 : sphereFlight(elapsed);
+      orb.position.set(
+        3.2 + Math.sin(elapsed * 0.8) * flight * 0.28,
+        2.13 + flight * 1.65,
+        -1.7 + Math.sin(elapsed * 0.55) * flight * 0.18,
       );
-      softenedPointer.y = THREE.MathUtils.damp(
-        softenedPointer.y,
-        canFollow ? pointer.y : 0,
-        5,
-        dt,
-      );
-      for (let i = 0; i < rooms.length; i++) {
-        if (reduced.matches) {
-          turn[i].value = turn[i].target;
-          turn[i].velocity = 0;
-        } else springStep(turn[i], dt);
-        rooms[i].rotation.y = turn[i].value;
-        pulses[i] += dt;
-      }
-      const pulse = (i: number, delay = 0) => {
-        const t = pulses[i] - delay;
-        return t < 0 || t > 2.4 || reduced.matches
-          ? 0
-          : Math.sin(t * 5) ** 2 * Math.exp(-t * 2.4);
-      };
-      orb.position.y = 1.85 + pulse(0) * 0.6;
       floating.forEach((b, i) => {
         b.position.y =
           0.4 +
           i * 0.65 +
-          Math.sin(elapsed * 0.55 + i) * 0.055 +
-          pulse(5, i * 0.08) * 0.22;
+          (reduced.matches ? 0 : Math.sin(elapsed * 0.8 - i * 0.65) * 0.1);
       });
       ripples.forEach((ring, i) => {
-        const t = (pulses[3] - i * 0.18) / 1.4;
-        ring.visible = !reduced.matches && t > 0 && t < 1;
-        ring.scale.setScalar(0.1 + THREE.MathUtils.clamp(t, 0, 1) * 1.5);
+        const t = (elapsed * 0.2 + i / 3) % 1;
+        ring.visible = !reduced.matches;
+        ring.scale.setScalar(0.15 + t * 1.45);
         (ring.material as THREE.MeshBasicMaterial).opacity =
-          Math.sin(Math.max(0, Math.min(1, t)) * Math.PI) * 0.45;
+          Math.sin(t * Math.PI) ** 2 * 0.3;
       });
       water.roughness = 0.15 + Math.sin(elapsed * 0.4) * 0.02;
-      lamp.emissiveIntensity = 2 + pulse(6) * 2;
+      lamp.emissiveIntensity = 2 + Math.sin(elapsed * 0.7) * 0.3;
       if (lastPalette !== state.current.palette) {
         lastPalette = state.current.palette;
         clayTarget.set(["#bf7357", "#bb927c", "#cd965c"][lastPalette]);
@@ -797,15 +657,18 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       }
       clay.color.lerp(clayTarget, reduced.matches ? 1 : 1 - Math.exp(-5 * dt));
       blue.color.lerp(blueTarget, reduced.matches ? 1 : 1 - Math.exp(-5 * dt));
-      // Invisible studies can be culled safely: their contribution is exactly zero.
-      drawStudy(phase.from, phase.mix * 1.3, outgoing);
-      if (phase.mix > 0) drawStudy(phase.to, -(1 - phase.mix) * 1.3, incoming);
+      // Cull only after the full layer has travelled beyond the viewport.
+      drawStudy(phase.from, outgoing);
+      if (phase.mix > 0) drawStudy(phase.to, incoming);
       composite.uniforms.to.value =
         phase.mix > 0 ? incoming.texture : outgoing.texture;
       composite.uniforms.blend.value = phase.mix;
+      composite.uniforms.background.value
+        .copy(backgrounds[phase.from])
+        .lerp(backgrounds[phase.to], phase.mix);
+      composite.uniforms.reducedMotion.value = reduced.matches;
       renderer.setRenderTarget(null);
       renderer.render(screen, screenCamera);
-      cameraFor(displayed);
       frame = requestAnimationFrame(render);
     }
     const contextLost = (e: Event) => {
@@ -827,13 +690,7 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
-      container.removeEventListener("pointermove", onPointer);
-      container.removeEventListener("pointerdown", onDown);
-      container.removeEventListener("pointerleave", onLeave);
-      container.removeEventListener("pointercancel", onCancel);
-      window.removeEventListener("pointerup", onUp);
       document.removeEventListener("visibilitychange", onVisibility);
-      interact.current = () => {};
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       const geometries = new Set<THREE.BufferGeometry>();
       scene.traverse((o) => {
@@ -854,19 +711,5 @@ export default function World({ progress, paused, palette, onReady }: Props) {
       renderer.domElement.remove();
     };
   }, [onReady, progress]);
-  return (
-    <div className="world" ref={host}>
-      <Button
-        ref={control}
-        variant="unstyled"
-        className="model-interaction"
-        onClick={() => interact.current()}
-        aria-label="Turn the architectural model"
-      >
-        <Rotate3D size={16} />
-        <span className="pointer-hint">Drag to explore · click to turn</span>
-        <span className="touch-hint">Touch to turn</span>
-      </Button>
-    </div>
-  );
+  return <div className="world" ref={host} aria-hidden="true" />;
 }

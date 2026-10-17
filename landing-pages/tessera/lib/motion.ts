@@ -8,15 +8,9 @@ export function chapterBlend(progress: number) {
   return { from, to: Math.min(7, from + 1), mix };
 }
 
-export type Spring = { value: number; velocity: number; target: number };
-export function springStep(spring: Spring, delta: number) {
-  // Small fixed substeps keep touch/drag release stable even on a slower device.
-  let remaining = Math.min(0.05, Math.max(0, delta));
-  while (remaining > 0) {
-    const dt = Math.min(remaining, 1 / 120);
-    spring.velocity +=
-      ((spring.target - spring.value) * 100 - spring.velocity * 19) * dt;
-    spring.value += spring.velocity * dt;
-    remaining -= dt;
-  }
+// The sphere takes off, floats and lands before resting on its pedestal.
+// Zero velocity at lift-off/landing also makes the eight-second loop seamless.
+export function sphereFlight(seconds: number) {
+  const cycle = ((seconds % 8) + 8) % 8;
+  return Math.sin(Math.PI * Math.min(1, cycle / 6.2)) ** 4;
 }

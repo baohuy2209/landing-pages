@@ -14,7 +14,7 @@ const { outputText } = ts.transpileModule(source, {
     target: ts.ScriptTarget.ES2022,
   },
 });
-const { chapterBlend, springStep } = await import(
+const { chapterBlend, sphereFlight } = await import(
   `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
 );
 const weights = (progress) => {
@@ -25,7 +25,7 @@ const weights = (progress) => {
   return result;
 };
 
-test("all seven chapter boundaries retain a complete model without a visibility jump", () => {
+test("all seven chapter boundaries retain a complete model without a position jump", () => {
   for (let boundary = 1; boundary <= 7; boundary++) {
     const before = weights(boundary - 0.00001);
     const after = weights(boundary + 0.00001);
@@ -35,7 +35,7 @@ test("all seven chapter boundaries retain a complete model without a visibility 
       assert.ok(Math.abs(before[i] - after[i]) < 1e-8);
   }
 });
-test("scrolling in either direction never produces an empty or overbright frame", () => {
+test("scrolling in either direction keeps chapter travel bounded and continuous", () => {
   for (let progress = -1; progress <= 9; progress += 0.002) {
     const values = weights(progress);
     assert.ok(values.every((value) => value >= -1e-12 && value <= 1 + 1e-12));
@@ -46,21 +46,14 @@ test("scrolling in either direction never produces an empty or overbright frame"
 test("a resting study stays fully visible before the handoff", () => {
   for (let i = 0; i < 8; i++) assert.equal(weights(i + 0.4)[i], 1);
 });
-test("drag release converges at 24, 30, 60 and 120 fps without a large bounce", () => {
-  for (const fps of [24, 30, 60, 120]) {
-    const spring = { value: 0, velocity: 0, target: -0.55 };
-    for (let i = 0; i < fps * 3; i++) {
-      springStep(spring, 1 / fps);
-      assert.ok(spring.value <= 0.001 && spring.value >= -0.56);
-    }
-    assert.ok(Math.abs(spring.value + 0.55) < 0.0001);
-    spring.target = 0.8;
-    for (let i = 0; i < fps * 3; i++) springStep(spring, 1 / fps);
-    assert.ok(Math.abs(spring.value - 0.8) < 0.0001);
+test("the sphere never passes through its pedestal and lands without a jump", () => {
+  for (let seconds = 0; seconds < 24; seconds += 0.01) {
+    const lift = sphereFlight(seconds);
+    assert.ok(lift >= 0 && lift <= 1);
+    assert.ok(Math.abs(lift - sphereFlight(seconds + 0.001)) < 0.002);
   }
-});
-test("resuming a suspended tab cannot launch a model out of frame", () => {
-  const spring = { value: 0, velocity: 0, target: 0.8 };
-  springStep(spring, 30);
-  assert.ok(spring.value >= 0 && spring.value < 0.3);
+  for (const seam of [6.2, 8, 14.2, 16]) {
+    assert.ok(sphereFlight(seam - 0.0001) < 1e-12);
+    assert.ok(sphereFlight(seam + 0.0001) < 1e-12);
+  }
 });
