@@ -168,8 +168,19 @@ header {
   position: relative;
   pointer-events: none;
 }
+.chapter-track {
+  /* Start pinning before the incoming fade, and release after the outgoing fade.
+     Native sticky positioning stays in sync with compositor-driven scrolling. */
+  position: absolute;
+  inset: -100svh 0;
+}
+.chapter:first-child .chapter-track {
+  top: 0;
+}
+.chapter:last-child .chapter-track {
+  bottom: 0;
+}
 .chapter-screen {
-  transform: translateY(calc(-1 * var(--approach, 0px)));
   height: 100svh;
   min-height: 620px;
   position: sticky;

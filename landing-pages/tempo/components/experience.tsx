@@ -268,61 +268,65 @@ export default function Experience() {
             key={c.label}
             aria-labelledby={`title-${i}`}
           >
-            <div className="chapter-screen">
-              <span className="study-mark" aria-hidden="true">
-                {c.mark.replace("↗", "/")}
-              </span>
-              <div className="chapter-copy">
-                <p className="eyebrow">
-                  <i />
-                  {c.tag}
-                </p>
-                {i === 0 ? (
-                  <h1 id={`title-${i}`}>{c.title}</h1>
-                ) : (
-                  <h2 id={`title-${i}`}>{c.title}</h2>
-                )}
-                <p className="description">{c.copy}</p>
-                {i === 0 && (
-                  <>
-                    <Button onClick={() => j.go(1)}>
-                      Explore the board <ArrowDown size={18} />
-                    </Button>
-                    <span className="hero-detail">TEN CHAPTERS. NO RUSH.</span>
-                  </>
-                )}
-                {i >= 2 && i <= 7 && <PieceStudy index={i - 2} />}
-                {i === 8 && (
-                  <div className="encounter-details">
-                    <div>
-                      <strong>44</strong>
-                      <span>MOVES TO REMEMBER</span>
-                    </div>
-                    <div>
-                      <strong>1–0</strong>
-                      <span>ONE EXTRAORDINARY GAME</span>
-                    </div>
-                    <Button onClick={() => j.go(9)}>
-                      Watch the game <ArrowRight size={17} />
-                    </Button>
-                  </div>
-                )}
-                {i === 9 && (
-                  <GamePlayer
-                    active={j.active === 9 && !open}
-                    ready={j.ready}
-                    step={step}
-                    setStep={setStep}
-                    fallback={j.fallback}
-                  />
-                )}
-              </div>
-              <div className="chapter-caption">
-                <span>AN EXERCISE IN POSSIBILITY</span>
-                <span>
-                  {String(i).padStart(2, "0")} — {c.label.toUpperCase()}
+            <div className="chapter-track">
+              <div className="chapter-screen">
+                <span className="study-mark" aria-hidden="true">
+                  {c.mark.replace("↗", "/")}
                 </span>
-                <ArrowDown size={18} />
+                <div className="chapter-copy">
+                  <p className="eyebrow">
+                    <i />
+                    {c.tag}
+                  </p>
+                  {i === 0 ? (
+                    <h1 id={`title-${i}`}>{c.title}</h1>
+                  ) : (
+                    <h2 id={`title-${i}`}>{c.title}</h2>
+                  )}
+                  <p className="description">{c.copy}</p>
+                  {i === 0 && (
+                    <>
+                      <Button onClick={() => j.go(1)}>
+                        Explore the board <ArrowDown size={18} />
+                      </Button>
+                      <span className="hero-detail">
+                        TEN CHAPTERS. NO RUSH.
+                      </span>
+                    </>
+                  )}
+                  {i >= 2 && i <= 7 && <PieceStudy index={i - 2} />}
+                  {i === 8 && (
+                    <div className="encounter-details">
+                      <div>
+                        <strong>44</strong>
+                        <span>MOVES TO REMEMBER</span>
+                      </div>
+                      <div>
+                        <strong>1–0</strong>
+                        <span>ONE EXTRAORDINARY GAME</span>
+                      </div>
+                      <Button onClick={() => j.go(9)}>
+                        Watch the game <ArrowRight size={17} />
+                      </Button>
+                    </div>
+                  )}
+                  {i === 9 && (
+                    <GamePlayer
+                      active={j.active === 9 && !open}
+                      ready={j.ready}
+                      step={step}
+                      setStep={setStep}
+                      fallback={j.fallback}
+                    />
+                  )}
+                </div>
+                <div className="chapter-caption">
+                  <span>AN EXERCISE IN POSSIBILITY</span>
+                  <span>
+                    {String(i).padStart(2, "0")} — {c.label.toUpperCase()}
+                  </span>
+                  <ArrowDown size={18} />
+                </div>
               </div>
             </div>
           </section>
