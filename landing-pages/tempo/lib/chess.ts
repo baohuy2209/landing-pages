@@ -1,55 +1,58 @@
-export const opening = [
-  {
-    notation: "e4",
-    from: "e2",
-    to: "e4",
-    idea: "Claim the centre. Open a path for your bishop.",
-  },
-  {
-    notation: "e5",
-    from: "e7",
-    to: "e5",
-    idea: "Black meets the idea with an equal share of space.",
-  },
-  {
-    notation: "Nf3",
-    from: "g1",
-    to: "f3",
-    idea: "Develop a knight, with a question for the e5 pawn.",
-  },
-  {
-    notation: "Nc6",
-    from: "b8",
-    to: "c6",
-    idea: "Defend the centre while bringing a new piece into play.",
-  },
-  {
-    notation: "Bc4",
-    from: "f1",
-    to: "c4",
-    idea: "The Italian Game. A bishop finds its long diagonal.",
-  },
-  {
-    notation: "Bc5",
-    from: "f8",
-    to: "c5",
-    idea: "The Giuoco Piano: both sides have made room to move.",
-  },
+import { gameMoves } from "./game-score";
+export { gameMoves };
+export const gameSource =
+  "https://www.chess.com/pt-BR/news/view/25-anos-atras-kasparov-topalov-1999";
+export const initialPieces = [1, 2, 7, 8].flatMap((rank) =>
+  [..."abcdefgh"].map((file, index) => ({
+    id: `${file}${rank}`,
+    type: rank === 2 || rank === 7 ? "p" : "rnbqkbnr"[index],
+    white: rank < 3,
+  })),
+);
+// Persistent identities let the same 32 sculptures survive captures, seeks and replay.
+// This replays a single, independently validated score; it is not a chess rules engine.
+const positions: Readonly<Record<string, string | null>>[] = [
+  Object.freeze(Object.fromEntries(initialPieces.map((p) => [p.id, p.id]))),
 ];
+for (const move of gameMoves) {
+  const next = { ...positions[positions.length - 1] };
+  const moving = Object.keys(next).find((id) => next[id] === move.from)!;
+  const captured = Object.keys(next).find((id) => next[id] === move.to);
+  if (captured) next[captured] = null;
+  next[moving] = move.to;
+  if (move.notation === "O-O-O") {
+    const rank = move.from[1];
+    next[`a${rank}`] = `d${rank}`;
+  }
+  positions.push(Object.freeze(next));
+}
+export const lastPly = gameMoves.length;
+export function positionAt(step: number) {
+  return positions[Math.max(0, Math.min(lastPly, Math.round(step)))];
+}
+export function pieceSquare(start: string, step: number) {
+  return positionAt(step)[start];
+}
 export function squarePosition(square: string): [number, number] {
   return [
     (square.charCodeAt(0) - 97 - 3.5) * 1.12,
     (3.5 - (Number(square[1]) - 1)) * 1.12,
   ];
 }
-export function pieceSquare(start: string, step: number) {
-  let square = start;
-  for (const move of opening.slice(
-    0,
-    Math.max(0, Math.min(6, Math.floor(step))),
-  ))
-    if (square === move.from) square = move.to;
-  return square;
+export function moveLabel(step: number) {
+  if (step === 0) return "Starting position";
+  const ply = Math.min(lastPly, Math.max(1, Math.round(step)));
+  return `${Math.ceil(ply / 2)}${ply % 2 ? "." : "…"} ${gameMoves[ply - 1].notation}`;
 }
-export const pgn =
-  '[Event "Tempo · Italian Game study"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 *\n';
+export function gameMoment(step: number) {
+  if (step === lastPly) return "1–0. Topalov resigns after 44. Qa7.";
+  if (step >= 73)
+    return "The final combination. Every remaining piece has a part to play.";
+  if (step >= 51)
+    return "A king on a journey. Follow Topalov’s king across the board.";
+  if (step >= 47)
+    return "24. Rxd4! A rook sacrifice changes the character of the game.";
+  if (step >= 26)
+    return "Both kings have castled long. The tension gathers on the queenside.";
+  return "The Pirc Defence. Space, development, and the first questions.";
+}

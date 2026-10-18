@@ -54,6 +54,11 @@ export function useJourney() {
       root.current?.style.setProperty("--journey", String(clamp(p / 9)));
       sections.forEach((s, i) => {
         const local = (scrollY - tops[i]) / h;
+        // Keep incoming copy in its reading position while the sculptures travel.
+        s.style.setProperty(
+          "--approach",
+          `${Math.max(0, tops[i] - scrollY)}px`,
+        );
         const enter = i === 0 ? 1 : ease((local + 0.35) / 0.32);
         const leave =
           i === sections.length - 1 ? 1 : 1 - ease((local - 0.28) / 0.38);

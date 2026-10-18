@@ -23,11 +23,11 @@ window.PROJECTS = [
     direction: "Sculptural chess",
     group: "immersive",
     description:
-      "A light, sculptural journey through sixty-four squares. Explore six original chess pieces, play through an Italian opening on the 3D board and keep the moves as a PGN.",
+      "A light, sculptural journey through sixty-four squares. Explore six sculptural piece studies and replay a complete grandmaster game on the 3D board, at your own pace.",
     short: "A small board. Extraordinary possibilities.",
     type: "Archivo, Manrope",
     signature:
-      "Ten WebGL chapters, original chess pieces and a playable opening",
+      "Ten WebGL chapters, sculptural chess studies and a complete grandmaster game",
     colors: ["#F3F1EC", "#B9472F", "#252B2C", "#CFC6B4"],
     stack: ["Next.js 16", "Tailwind CSS 4", "shadcn/ui", "Three.js"],
     image: "showcase/tempo.png",

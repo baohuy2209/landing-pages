@@ -9,8 +9,6 @@ import {
   Plus,
   Waves,
   Wind,
-  Download,
-  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,8 +21,8 @@ import {
 } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
 import { useJourney } from "@/lib/use-journey";
-import { download } from "@/lib/journey";
-import { opening, pgn } from "@/lib/chess";
+import { PieceStudy } from "./piece-study";
+import { GamePlayer } from "./game-player";
 const World = dynamic(() => import("./world"), { ssr: false });
 const chapters = [
   {
@@ -132,29 +130,29 @@ const chapters = [
     mark: "KING / 01",
   },
   {
-    label: "The opening",
-    tag: "08 / SIX MOVES. ONE NEW PERSPECTIVE.",
+    label: "The encounter",
+    tag: "08 / WIJK AAN ZEE · 20 JANUARY 1999",
     title: (
       <>
-        An opening
+        Put it all
         <br />
-        <em>conversation.</em>
+        <em>together.</em>
       </>
     ),
-    copy: "Meet the Italian Game. Follow each move on the board, and notice how space, development and intention come together.",
-    mark: "1. e4 e5",
+    copy: "Two grandmasters. One extraordinary afternoon. Watch Kasparov and Topalov turn everything you have just explored into a game that still invites a closer look.",
+    mark: "KASPAROV / TOPALOV",
   },
   {
-    label: "Your next move",
-    tag: "09 / THERE IS ALWAYS SOMETHING TO SEE",
+    label: "The immortal game",
+    tag: "09 / THE IMMORTAL · ROUND 04",
     title: (
       <>
-        Your move.
+        An immortal
         <br />
-        <em>Your tempo.</em>
+        <em>game.</em>
       </>
     ),
-    copy: "No clock to beat here. Keep the opening, set up a board, and find a little time for a game with someone you like.",
+    copy: "The complete game, at your own pace.",
     mark: "∞ / PLAY",
   },
 ];
@@ -169,7 +167,7 @@ export default function Experience() {
       description:
         "Ambient animations " +
         (j.paused ? "on" : "off") +
-        ". Scroll and opening controls remain active.",
+        ". Scroll and game controls remain active.",
     });
   }
   return (
@@ -265,7 +263,7 @@ export default function Experience() {
       <main>
         {chapters.map((c, i) => (
           <section
-            className={`chapter chapter-${i}`}
+            className={`chapter chapter-${i}${i >= 2 && i <= 7 ? " chapter-study" : ""}`}
             id={`chapter-${i}`}
             key={c.label}
             aria-labelledby={`title-${i}`}
@@ -293,93 +291,30 @@ export default function Experience() {
                     <span className="hero-detail">TEN CHAPTERS. NO RUSH.</span>
                   </>
                 )}
-                {i === 3 && (
-                  <div
-                    className="knight-route"
-                    aria-label="A knight moves two squares then one to the side"
-                  >
-                    <span>02</span>
-                    <div />
-                    <span>01</span>
-                    <p>
-                      The unexpected
-                      <br />
-                      is a valid move.
-                    </p>
-                  </div>
-                )}
+                {i >= 2 && i <= 7 && <PieceStudy index={i - 2} />}
                 {i === 8 && (
-                  <div className="opening-lab">
-                    <div className="move-heading">
-                      <strong>
-                        {String(step).padStart(2, "0")}
-                        <span> / 06</span>
-                      </strong>
-                      <span>
-                        {step === 0
-                          ? "THE STARTING POSITION"
-                          : opening[step - 1].notation}
-                      </span>
+                  <div className="encounter-details">
+                    <div>
+                      <strong>44</strong>
+                      <span>MOVES TO REMEMBER</span>
                     </div>
-                    <p aria-live="polite">
-                      {step === 0
-                        ? "White moves first. Take it one idea at a time."
-                        : opening[step - 1].idea}
-                    </p>
-                    <div className="move-buttons">
-                      <Button
-                        variant="outline"
-                        aria-label="Previous opening move"
-                        disabled={step === 0}
-                        onClick={() => setStep((s) => s - 1)}
-                      >
-                        <ArrowLeft size={16} />
-                      </Button>
-                      <Button
-                        onClick={() => setStep((s) => Math.min(6, s + 1))}
-                        disabled={step === 6}
-                      >
-                        {step === 6 ? "Opening complete" : "Next move"}
-                        <ArrowRight size={16} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Reset the opening"
-                        onClick={() => setStep(0)}
-                      >
-                        <RotateCcw size={17} />
-                      </Button>
+                    <div>
+                      <strong>1–0</strong>
+                      <span>ONE EXTRAORDINARY GAME</span>
                     </div>
-                    <div className="notation" aria-label="Opening move list">
-                      {opening.map((m, n) => (
-                        <span key={m.from} data-played={n < step}>
-                          {n % 2 === 0 ? `${Math.floor(n / 2) + 1}. ` : ""}
-                          {m.notation}
-                        </span>
-                      ))}
-                    </div>
+                    <Button onClick={() => j.go(9)}>
+                      Watch the game <ArrowRight size={17} />
+                    </Button>
                   </div>
                 )}
                 {i === 9 && (
-                  <>
-                    <Button
-                      onClick={() =>
-                        download(
-                          "tempo-italian-game.pgn",
-                          pgn,
-                          "application/x-chess-pgn",
-                        )
-                      }
-                    >
-                      Keep the opening <Download size={17} />
-                    </Button>
-                    <p className="download-note">
-                      A PGN file for your favourite chess app.
-                      <br />
-                      Free to explore. Yours to play.
-                    </p>
-                  </>
+                  <GamePlayer
+                    active={j.active === 9 && !open}
+                    ready={j.ready}
+                    step={step}
+                    setStep={setStep}
+                    fallback={j.fallback}
+                  />
                 )}
               </div>
               <div className="chapter-caption">

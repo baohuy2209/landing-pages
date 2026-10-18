@@ -2,11 +2,12 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { motionAt, beginMove } from "@/lib/motion";
+import { motionAt, beginMove, arrivalPose } from "@/lib/motion";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { makeStage } from "@/lib/stage";
 import { interpolate, ease } from "@/lib/journey";
-import { pieceSquare, squarePosition } from "@/lib/chess";
+import { pieceSquare, squarePosition, gameMoves } from "@/lib/chess";
+import { studies as studyData } from "@/lib/studies";
 type Props = {
   progress: React.RefObject<number>;
   paused: boolean;
@@ -373,7 +374,9 @@ export default function World({ progress, paused, step, onReady }: Props) {
       object: THREE.Group;
       start: string;
       motion: ReturnType<typeof beginMove>;
-      destination: string;
+      destination: string | null;
+      materials: THREE.Material[];
+      alpha: number;
     }[] = [];
     const back = ["r", "n", "b", "q", "k", "b", "n", "r"];
     // The board and its pieces travel together. Close-ups are independent sculptures.
@@ -383,7 +386,7 @@ export default function World({ progress, paused, step, onReady }: Props) {
           rank = i < 8 ? (white ? 1 : 8) : white ? 2 : 7,
           type = i < 8 ? back[file] : "p",
           start = "abcdefgh"[file] + rank;
-        const object = piece(
+        const { object, materials } = sculpture(
           type,
           start === "d1" ? vermilion : white ? ivory : obsidian,
         );
@@ -393,6 +396,8 @@ export default function World({ progress, paused, step, onReady }: Props) {
         object.position.set(x, 0.171, z);
         pieces.push({
           object,
+          materials,
+          alpha: 1,
           start,
           destination: start,
           motion: beginMove([x, 0, z], [x, z], 0),
@@ -417,20 +422,13 @@ export default function World({ progress, paused, step, onReady }: Props) {
       item.materials.forEach((m) => {
         m.transparent = true;
         m.opacity = value;
-        m.depthWrite = value > 0.98;
+        m.depthWrite = value > 0.98 && !(m instanceof THREE.MeshBasicMaterial);
       });
       item.object.visible = value > 0.0001;
     }
-    const hero = [
-      sculpture("n", ivory),
-      sculpture("r", obsidian),
-      sculpture("q", vermilion),
-    ];
-    const heroLayout = [
-      [2.5, -0.5, 1.5, 3.3],
-      [6.3, -0.5, -1.7, 3.1],
-      [-2.5, -0.5, -1.5, 2.9],
-    ];
+    const hero = ["g1", "a8", "d1"].map((id) =>
+      pieces.find((p) => p.start === id)!,
+    );
     const studies = ["p", "n", "b", "r", "q", "k"].map((type) =>
       sculpture(type, type === "q" ? vermilion : ivory),
     );
@@ -475,29 +473,73 @@ export default function World({ progress, paused, step, onReady }: Props) {
       [0],
       [0],
     ];
-    const diagonal = new THREE.Group();
-    scene.add(diagonal);
-    const diagonalMaterial = new THREE.MeshBasicMaterial({
-      color: "#d4563c",
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-    });
-    for (let i = -3; i <= 3; i++) {
-      const h = add(
-        diagonal,
-        new THREE.PlaneGeometry(0.9, 0.9),
-        diagonalMaterial,
-        3.2 + i * 1.1,
-        -0.491,
-        1.5 + i * 1.1,
+    // A single printed movement field per sculpture keeps the mobile draw cost small.
+    const fields = studyData.map((data) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 640;
+      const ctx = canvas.getContext("2d")!;
+      for (let row = 0; row < 5; row++)
+        for (let col = 0; col < 5; col++) {
+          const x = col * 128,
+            y = row * 128;
+          ctx.fillStyle =
+            (col + row) % 2 ? "rgba(62,74,73,.045)" : "rgba(62,74,73,.09)";
+          ctx.fillRect(x + 1, y + 1, 126, 126);
+          ctx.strokeStyle = "rgba(62,74,73,.15)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 1, y + 1, 126, 126);
+          if (data.moves.some(([a, b]) => a === col - 2 && b === row - 2)) {
+            ctx.fillStyle = "rgba(198,62,38,.18)";
+            ctx.fillRect(x + 4, y + 4, 120, 120);
+            ctx.strokeStyle = "rgba(198,62,38,.6)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x + 64, y + 64, 13, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          if (data.captures.some(([a, b]) => a === col - 2 && b === row - 2)) {
+            ctx.strokeStyle = "rgba(198,62,38,.7)";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x + 50, y + 50);
+            ctx.lineTo(x + 78, y + 78);
+            ctx.moveTo(x + 78, y + 50);
+            ctx.lineTo(x + 50, y + 78);
+            ctx.stroke();
+          }
+        }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy(),
       );
-      h.rotation.x = -Math.PI / 2;
-      h.castShadow = false;
-    }
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        opacity: 0,
+      });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(11, 11), material);
+      plane.rotation.x = -Math.PI / 2;
+      scene.add(plane);
+      return plane;
+    });
+    const moveHighlights = [0, 1].map(() => {
+      const mat = new THREE.MeshBasicMaterial({
+        color: "#c63e26",
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const tile = new THREE.Mesh(new THREE.PlaneGeometry(1.09, 1.09), mat);
+      tile.rotation.x = -Math.PI / 2;
+      board.add(tile);
+      return tile;
+    });
     const cameraKeys = [
       [16, 10, 24, -3.3, 2, 0],
-      [14, 19, 18, -2.7, 0.7, 0],
+      [14, 21, 20, -4.8, 0.7, 0],
       [13, 10, 24, -3.6, 1.9, 0],
       [13, 10, 24, -3.6, 2.1, 0],
       [16, 14, 24, -3.6, 1.7, 0],
@@ -505,7 +547,7 @@ export default function World({ progress, paused, step, onReady }: Props) {
       [12, 10, 24, -3.6, 2.1, 0],
       [14, 11, 25, -3.6, 1.7, 0],
       [13, 18, 18, -3.3, 0, 0],
-      [16, 11, 26, -3.6, 1, 0],
+      [12, 23, 15, -3.8, 0, 0],
     ];
     const look = new THREE.Vector3();
     function render(now: number) {
@@ -530,15 +572,6 @@ export default function World({ progress, paused, step, onReady }: Props) {
       camera.lookAt(look);
       const boardPose = interpolate(boardKeys, current);
       board.position.set(boardPose[0], -0.105, boardPose[1]);
-      const heroExit = ease((current - 0.18) / 0.82);
-      hero.forEach((item, i) => {
-        const p = heroLayout[i];
-        item.object.position.set(p[0] - heroExit * 24, p[1], p[2]);
-        item.object.scale.setScalar(p[3]);
-        item.object.rotation.y =
-          (i === 0 ? -0.35 : 0) + Math.sin(elapsed * 0.4 + i) * 0.018;
-        opacity(item, 1 - ease(heroExit));
-      });
       studies.forEach((item, i) => {
         const x = interpolate(studyKeys[i], current)[0],
           visibility = 1 - ease((Math.abs(x - 3.2) - 3) / 12);
@@ -551,13 +584,16 @@ export default function World({ progress, paused, step, onReady }: Props) {
             cycle = (elapsed % 8) / 8;
           const journey =
             ease((cycle - 0.18) / 0.28) * (1 - ease((cycle - 0.68) / 0.25));
-          item.object.position.x += ease(journey / 0.67) * 1.5 * weight;
+          item.object.position.x += ease(journey / 0.67) * 4.4 * weight;
           item.object.position.z +=
-            ease((journey - 0.67) / 0.33) * 0.75 * weight;
+            ease((journey - 0.67) / 0.33) * 2.2 * weight;
           jump = Math.sin(Math.PI * journey) * 0.7 * weight;
           item.object.position.y += jump;
         }
         opacity(item, visibility);
+        fields[i].position.set(x, -0.488, 1.5);
+        fields[i].material.opacity = visibility * 0.8;
+        fields[i].visible = visibility > 0.001;
         const contact = item.object.getObjectByName(
           "contact-shadow",
         ) as THREE.Mesh;
@@ -568,30 +604,66 @@ export default function World({ progress, paused, step, onReady }: Props) {
       });
       pieces.forEach((p) => {
         const destination =
-          current < 7.15 ? p.start : pieceSquare(p.start, state.current.step);
+          current < 8.15 ? p.start : pieceSquare(p.start, state.current.step);
         if (destination !== p.destination) {
-          const previous = motionAt(p.motion, now / 1000);
-          p.motion = beginMove(
-            previous,
-            squarePosition(destination),
-            now / 1000,
-          );
+          if (destination)
+            p.motion = beginMove(
+              motionAt(p.motion, now / 1000),
+              squarePosition(destination),
+              now / 1000,
+            );
           p.destination = destination;
         }
         const pos = motionAt(
           p.motion,
           reduced.matches ? now / 1000 + 1 : now / 1000,
         );
-        p.object.position.set(pos[0], 0.171 + pos[1], pos[2]);
+        p.alpha = reduced.matches
+          ? Number(destination !== null)
+          : THREE.MathUtils.damp(p.alpha, Number(destination !== null), 16, dt);
+        opacity(p, p.alpha);
+        p.object.scale.setScalar(0.92 + 0.08 * p.alpha);
+        p.object.position.set(
+          pos[0],
+          0.171 + pos[1] + (1 - p.alpha) * 0.25,
+          pos[2],
+        );
         const contact = p.object.getObjectByName(
           "contact-shadow",
         ) as THREE.Mesh;
-        contact.position.y = 0.002 - pos[1];
+        contact.position.y = 0.002 - pos[1] - (1 - p.alpha) * 0.25;
         contact.scale.setScalar(1 + pos[1] * 0.35);
         (contact.material as THREE.MeshBasicMaterial).opacity =
-          1 - pos[1] * 0.5;
+          p.alpha * (1 - pos[1] * 0.5);
       });
-      diagonalMaterial.opacity = ease(1 - Math.abs(current - 4) * 1.6) * 0.2;
+      // No swaps or duplicates: the three hero pieces land on their own squares.
+      if (current < 1)
+        hero.forEach((p, i) => {
+          const pose = arrivalPose(current, i, squarePosition(p.start));
+          p.object.position.set(
+            pose.x - board.position.x,
+            pose.y - board.position.y,
+            pose.z - board.position.z,
+          );
+          p.object.scale.setScalar(pose.scale);
+          const contact = p.object.getObjectByName(
+            "contact-shadow",
+          ) as THREE.Mesh;
+          contact.position.y = (pose.surface - pose.y + 0.005) / pose.scale;
+          contact.scale.setScalar(1 + (pose.y - pose.surface) * 0.25);
+          (contact.material as THREE.MeshBasicMaterial).opacity = Math.max(
+            0.18,
+            1 - (pose.y - pose.surface) * 0.2,
+          );
+        });
+      const move = gameMoves[state.current.step - 1];
+      moveHighlights.forEach((tile, i) => {
+        tile.material.opacity = ease((current - 8.4) / 0.6) * (move ? 0.32 : 0);
+        if (move) {
+          const [x, z] = squarePosition(i === 0 ? move.from : move.to);
+          tile.position.set(x, 0.176, z);
+        }
+      });
       key.position.x = -8 + Math.sin(elapsed * 0.18) * 0.3;
       renderer.render(scene, camera);
       frame = requestAnimationFrame(render);

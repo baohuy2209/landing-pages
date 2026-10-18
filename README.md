@@ -10,7 +10,7 @@ Built with Next.js, Tailwind CSS and fully customized shadcn/ui.
 | Preview | Project | Concept |
 | --- | --- | --- |
 | [![Veillée](www/showcase/veillee.png)](https://veillee-lndev.vercel.app) | **[Veillée](landing-pages/veillee)** · [Live](https://veillee-lndev.vercel.app) | An immersive Werewolf game night |
-| [![Tempo](www/showcase/tempo.png)](https://tempo-lndev.vercel.app) | **[Tempo](landing-pages/tempo)** · [Live](https://tempo-lndev.vercel.app) | A sculptural chess journey with a playable opening |
+| [![Tempo](www/showcase/tempo.png)](https://tempo-lndev.vercel.app) | **[Tempo](landing-pages/tempo)** · [Live](https://tempo-lndev.vercel.app) | A sculptural chess journey with a complete grandmaster game |
 | [![Tessera](www/showcase/tessera.jpg)](https://tessera-lndev.vercel.app) | **[Tessera](landing-pages/tessera)** · [Live](https://tessera-lndev.vercel.app) | Eight-room architectural 3D promenade |
 | [![Oddpress](www/showcase/oddpress.jpg)](https://oddpress-lndev.vercel.app) | **[Oddpress](landing-pages/oddpress)** · [Live](https://oddpress-lndev.vercel.app) | Independent print club with a live ink lab |
 | [![Fallow](www/showcase/fallow.jpg)](https://fallow-lndev.vercel.app) | **[Fallow](landing-pages/fallow)** · [Live](https://fallow-lndev.vercel.app) | Interactive 3D botanical story |

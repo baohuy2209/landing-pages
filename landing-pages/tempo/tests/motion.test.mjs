@@ -9,7 +9,7 @@ const source = await readFile(
 const js = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext },
 }).outputText;
-const { beginMove, motionAt } = await import(
+const { beginMove, motionAt, arrivalPose } = await import(
   `data:text/javascript;base64,${Buffer.from(js).toString("base64")}`
 );
 test("an opening move lifts off and lands without a position jump", () => {
@@ -39,4 +39,25 @@ test("rapid next, previous and reset preserve the pose already in flight", () =>
 test("unchanged pieces remain grounded", () => {
   const m = beginMove([2, 0, 3], [2, 3], 0);
   for (let t = 0; t < 2; t += 0.01) assert.deepEqual(motionAt(m, t), [2, 0, 3]);
+});
+
+test("hero pieces arrive on their board squares without fading, replacement or a final jump", () => {
+  for (let i = 0; i < 3; i++) {
+    const target = [i * 1.12, 3.92];
+    const end = arrivalPose(1, i, target);
+    assert.equal(end.x, target[0]);
+    assert.equal(end.z, target[1]);
+    assert.equal(end.scale, 1);
+    assert.ok(Math.abs(end.y - 0.066) < 1e-10);
+    for (const p of [0.12 + i * 0.045, 1]) {
+      const a = arrivalPose(p - 1e-6, i, target),
+        b = arrivalPose(p + 1e-6, i, target);
+      for (const key of ["x", "y", "z", "scale"])
+        assert.ok(Math.abs(a[key] - b[key]) < 1e-8);
+    }
+    for (let p = 0; p <= 1; p += 0.01)
+      assert.ok(
+        arrivalPose(p, i, target).y >= arrivalPose(p, i, target).surface - 1e-9,
+      );
+  }
 });

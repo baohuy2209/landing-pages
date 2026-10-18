@@ -1,10 +1,12 @@
 # Tempo
 
-An imaginary chess club, presented as a sculptural editorial journey. Ivory, graphite and vermilion pieces move through ten chapters: the board, six piece studies, a playable opening and your next game.
+An imaginary chess club, presented as a sculptural editorial journey. Ivory, graphite and vermilion pieces move through ten chapters: the board, six movement studies and a complete grandmaster game.
 
-Step through the first six plies of the Italian Game (`1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5`), go backwards, reset the board or download the opening as a PGN. This is an interactive study, not a chess engine or multiplayer game.
+The three hero pieces travel into their own squares on the board. Each piece study combines an original sculpture with a movement field, diagram and short practical notes. The journey spans 21 viewport heights and has separate mobile framing.
 
-The journey spans 21 viewport heights. The complete board stays assembled while separate, original sculptures glide through the six piece studies. Smooth profiles, real bevelled notches and grounded contact shadows give the pieces a tactile finish. Opening moves follow interruptible arcs, including when stepping backwards or resetting mid-move. Mobile uses its own framing.
+The final section replays **Kasparov–Topalov, Wijk aan Zee, 20 January 1999 (1–0)** in full: 87 plies, including castling and captures. Auto playback runs only while the player is visible; pause, step in either direction, seek, replay or download the PGN. Reduced-motion visitors start with playback paused. This is a recorded game, not a chess engine or multiplayer service.
+
+The local score was cross-checked with [ChessBox’s game record](https://www.chessbox.in/chessgame/kasparov-garry-topalov-veselin-30/) and the event details with [Chess.com’s anniversary report](https://www.chess.com/pt-BR/news/view/25-anos-atras-kasparov-topalov-1999). No third-party annotations are reproduced. `scripts/verify-game.py` regenerates legal move data and position fixtures with the optional development tool `python-chess`; no chess library runs in the browser.
 
 ## Development
 
