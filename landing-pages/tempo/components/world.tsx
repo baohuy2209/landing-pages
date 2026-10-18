@@ -7,6 +7,13 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { makeStage } from "@/lib/stage";
 import { interpolate, ease } from "@/lib/journey";
 import { pieceSquare, squarePosition, gameMoves } from "@/lib/chess";
+import {
+  studySlide,
+  studyMotion,
+  sculptureSurface,
+  SCENE_TRAVEL,
+  STUDY_SCALE,
+} from "@/lib/study-motion";
 import { studies as studyData } from "@/lib/studies";
 type Props = {
   progress: React.RefObject<number>;
@@ -389,6 +396,7 @@ export default function World({ progress, paused, step, onReady }: Props) {
         const { object, materials } = sculpture(
           type,
           start === "d1" ? vermilion : white ? ivory : obsidian,
+          true,
         );
         board.add(object);
         if (type === "n") object.rotation.y = white ? -0.35 : Math.PI - 0.35;
@@ -403,13 +411,20 @@ export default function World({ progress, paused, step, onReady }: Props) {
           motion: beginMove([x, 0, z], [x, z], 0),
         });
       }
-    function sculpture(type: string, mat: THREE.Material) {
+    function sculpture(type: string, mat: THREE.Material, captured = false) {
       const object = piece(type, mat);
       const materials = new Map<THREE.Material, THREE.Material>();
       object.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           const source = o.material as THREE.Material;
-          if (!materials.has(source)) materials.set(source, source.clone());
+          if (!materials.has(source)) {
+            const material = source.clone();
+            Object.assign(
+              material,
+              sculptureSurface(o.name === "contact-shadow", captured),
+            );
+            materials.set(source, material);
+          }
           o.material = materials.get(source)!;
           if (o.name === "contact-shadow") source.dispose();
         }
@@ -418,11 +433,9 @@ export default function World({ progress, paused, step, onReady }: Props) {
       scene.add(object);
       return { object, materials: [...materials.values()] };
     }
-    function opacity(item: ReturnType<typeof sculpture>, value: number) {
+    function captureOpacity(item: ReturnType<typeof sculpture>, value: number) {
       item.materials.forEach((m) => {
-        m.transparent = true;
         m.opacity = value;
-        m.depthWrite = value > 0.98 && !(m instanceof THREE.MeshBasicMaterial);
       });
       item.object.visible = value > 0.0001;
     }
@@ -432,20 +445,15 @@ export default function World({ progress, paused, step, onReady }: Props) {
     const studies = ["p", "n", "b", "r", "q", "k"].map((type) =>
       sculpture(type, type === "q" ? vermilion : ivory),
     );
-    const studyKeys = studies.map((_, i) =>
-      Array.from({ length: 10 }, (_, chapter) => [
-        3.2 + (i - (chapter - 2)) * 22,
-      ]),
-    );
     const boardKeys = [
-      [38, 0],
+      [SCENE_TRAVEL, 0],
       [0, 0],
-      [-38, 0],
-      [-38, -60],
-      [38, -60],
-      [38, 0],
-      [38, 0],
-      [38, 0],
+      [-SCENE_TRAVEL, 0],
+      [-SCENE_TRAVEL, -60],
+      [SCENE_TRAVEL, -60],
+      [SCENE_TRAVEL, 0],
+      [SCENE_TRAVEL, 0],
+      [SCENE_TRAVEL, 0],
       [0, 0],
       [0, 0],
     ];
@@ -525,6 +533,14 @@ export default function World({ progress, paused, step, onReady }: Props) {
       scene.add(plane);
       return plane;
     });
+    const studyScenes = studies.map((item, i) => {
+      const group = new THREE.Group();
+      group.add(item.object, fields[i]);
+      fields[i].position.set(0, -0.488, 0);
+      fields[i].material.opacity = 0.8;
+      scene.add(group);
+      return { group, elapsed: 0 };
+    });
     const moveHighlights = [0, 1].map(() => {
       const mat = new THREE.MeshBasicMaterial({
         color: "#c63e26",
@@ -572,35 +588,33 @@ export default function World({ progress, paused, step, onReady }: Props) {
       camera.lookAt(look);
       const boardPose = interpolate(boardKeys, current);
       board.position.set(boardPose[0], -0.105, boardPose[1]);
+      // Reposition the board only after it has fully left the view.
+      board.visible = current < 2 || current > 7;
       studies.forEach((item, i) => {
-        const x = interpolate(studyKeys[i], current)[0],
-          visibility = 1 - ease((Math.abs(x - 3.2) - 3) / 12);
-        item.object.position.set(x, -0.5, 1.5);
-        item.object.scale.setScalar(2.8);
+        const x = studySlide(i, current),
+          study = studyScenes[i];
+        study.group.position.set(x, 0, 1.5);
+        // Freeze the local demonstration during a scene transition; the whole scene slides together.
+        if (
+          Math.abs(current - (i + 2)) < 0.18 &&
+          !state.current.paused &&
+          !reduced.matches
+        )
+          study.elapsed += dt;
+        if (Math.abs(x - 3.2) >= SCENE_TRAVEL - 0.001) study.elapsed = 0;
+        const pose = reduced.matches
+          ? { x: 0, y: 0, z: 0 }
+          : studyMotion(i, study.elapsed);
+        item.object.position.set(pose.x, -0.5 + pose.y, pose.z);
+        item.object.scale.setScalar(STUDY_SCALE);
         item.object.rotation.y = i === 1 ? -0.35 : i === 2 ? -0.12 : 0;
-        let jump = 0;
-        if (i === 1 && !reduced.matches) {
-          const weight = ease(1 - Math.abs(current - 3) * 1.6),
-            cycle = (elapsed % 8) / 8;
-          const journey =
-            ease((cycle - 0.18) / 0.28) * (1 - ease((cycle - 0.68) / 0.25));
-          item.object.position.x += ease(journey / 0.67) * 4.4 * weight;
-          item.object.position.z +=
-            ease((journey - 0.67) / 0.33) * 2.2 * weight;
-          jump = Math.sin(Math.PI * journey) * 0.7 * weight;
-          item.object.position.y += jump;
-        }
-        opacity(item, visibility);
-        fields[i].position.set(x, -0.488, 1.5);
-        fields[i].material.opacity = visibility * 0.8;
-        fields[i].visible = visibility > 0.001;
         const contact = item.object.getObjectByName(
           "contact-shadow",
         ) as THREE.Mesh;
-        contact.position.y = (0.005 - jump) / 2.8;
-        contact.scale.setScalar(1 + jump * 0.3);
+        contact.position.y = (0.005 - pose.y) / STUDY_SCALE;
+        contact.scale.setScalar(1 + pose.y * 0.3);
         (contact.material as THREE.MeshBasicMaterial).opacity =
-          visibility * (1 - jump * 0.45);
+          1 - pose.y * 0.45;
       });
       pieces.forEach((p) => {
         const destination =
@@ -621,8 +635,8 @@ export default function World({ progress, paused, step, onReady }: Props) {
         p.alpha = reduced.matches
           ? Number(destination !== null)
           : THREE.MathUtils.damp(p.alpha, Number(destination !== null), 16, dt);
-        opacity(p, p.alpha);
-        p.object.scale.setScalar(0.92 + 0.08 * p.alpha);
+        captureOpacity(p, p.alpha);
+        p.object.scale.setScalar(1);
         p.object.position.set(
           pos[0],
           0.171 + pos[1] + (1 - p.alpha) * 0.25,

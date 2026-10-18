@@ -2,7 +2,7 @@
 
 An imaginary chess club, presented as a sculptural editorial journey. Ivory, graphite and vermilion pieces move through ten chapters: the board, six movement studies and a complete grandmaster game.
 
-The three hero pieces travel into their own squares on the board. Each piece study combines an original sculpture with a movement field, diagram and short practical notes. The journey spans 21 viewport heights and has separate mobile framing.
+The three hero pieces travel into their own squares on the board. Each piece study combines an opaque, rigid sculpture with a movement field, diagram and short practical notes. The whole scene slides in and out together. Every piece demonstrates its own movement; the pawn advances twice and waits, while the other studies follow legal repeating routes. Ambient motion can be paused. The journey spans 21 viewport heights and has separate mobile framing.
 
 The final section replays **Kasparov–Topalov, Wijk aan Zee, 20 January 1999 (1–0)** in full: 87 plies, including castling and captures. Auto playback runs only while the player is visible; pause, step in either direction, seek, replay or download the PGN. Reduced-motion visitors start with playback paused. This is a recorded game, not a chess engine or multiplayer service.
 
