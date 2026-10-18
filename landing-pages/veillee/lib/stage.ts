@@ -70,7 +70,8 @@ export function makeStage(host: HTMLDivElement, dark = false) {
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.clearViewOffset();
-    if (mobile.matches) camera.setViewOffset(w, h, 0, -h * 0.22, w, h);
+    if (mobile.matches) camera.setViewOffset(w, h, 0, -h * 0.2, w, h);
+    else camera.setViewOffset(w, h, -w * 0.21, 0, w, h);
     camera.updateProjectionMatrix();
   }
   const observer = new ResizeObserver(resize);

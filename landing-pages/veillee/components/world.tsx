@@ -1,21 +1,43 @@
 "use client";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { makeStage } from "@/lib/stage";
 import { interpolate } from "@/lib/journey";
+import { houses, nightAt, windowLight, cue } from "@/lib/story";
+import {
+  material,
+  mesh,
+  box,
+  ellipsoid,
+  makeWolf,
+  cardTexture,
+} from "@/lib/models";
+
 type Props = {
   progress: React.RefObject<number>;
   paused: boolean;
   role: number;
+  victim: number;
+  vision: number;
+  accused: number;
+  players: number;
   onReady: (ok: boolean) => void;
 };
-export default function World({ progress, paused, role, onReady }: Props) {
-  const host = useRef<HTMLDivElement>(null),
-    state = useRef({ paused, role });
+export default function World({
+  progress,
+  paused,
+  role,
+  victim,
+  vision,
+  accused,
+  players,
+  onReady,
+}: Props) {
+  const host = useRef<HTMLDivElement>(null);
+  const state = useRef({ paused, role, victim, vision, accused, players });
   useEffect(() => {
-    state.current = { paused, role };
-  }, [paused, role]);
+    state.current = { paused, role, victim, vision, accused, players };
+  }, [paused, role, victim, vision, accused, players]);
   useEffect(() => {
     if (!host.current) return;
     let stage: ReturnType<typeof makeStage>;
@@ -25,559 +47,609 @@ export default function World({ progress, paused, role, onReady }: Props) {
       onReady(false);
       return;
     }
-    const { renderer, scene, camera, key, hemi, reduced, mobile } = stage;
+    const { renderer, scene, camera, key, hemi, fill, reduced, mobile } = stage;
     let frame = 0,
       disposed = false,
       elapsed = 0,
       last = performance.now(),
       scroll = progress.current;
-    scene.fog = new THREE.FogExp2("#101b19", 0.018);
-    const material = (color: string, roughness = 0.7, metalness = 0) =>
-      new THREE.MeshStandardMaterial({ color, roughness, metalness });
-    const stone = material("#44534b"),
-      wood = material("#47382c"),
-      roof = material("#343d39"),
-      copper = material("#b6824c", 0.3, 0.65),
-      cream = material("#d4c6a0"),
-      leaves = material("#182f29"),
-      trunk = material("#344036");
-    const glow = new THREE.MeshStandardMaterial({
-      color: "#ffc775",
-      emissive: "#f7ab4e",
-      emissiveIntensity: 1.6,
-    });
-    function mesh(
-      parent: THREE.Object3D,
-      g: THREE.BufferGeometry,
-      m: THREE.Material,
-      x = 0,
-      y = 0,
-      z = 0,
-    ) {
-      const o = new THREE.Mesh(g, m);
-      o.position.set(x, y, z);
-      o.castShadow = true;
-      o.receiveShadow = true;
-      parent.add(o);
-      return o;
-    }
-    function box(
-      parent: THREE.Object3D,
-      w: number,
-      h: number,
-      d: number,
-      m: THREE.Material,
-      x = 0,
-      y = 0,
-      z = 0,
-    ) {
-      return mesh(parent, new RoundedBoxGeometry(w, h, d, 3, 0.04), m, x, y, z);
-    }
-    const ground = mesh(
-      scene,
-      new THREE.PlaneGeometry(220, 220),
-      material("#1d2d26"),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.2;
-    // A continuous village: the camera revisits the same place at night and dawn.
-    const village = new THREE.Group();
-    scene.add(village);
-    for (let i = 0; i < 11; i++) {
-      const a = (i / 11) * Math.PI * 2,
-        r = 7 + (i % 3) * 0.45;
-      const house = new THREE.Group();
-      house.position.set(Math.sin(a) * r, 0, Math.cos(a) * r);
-      house.rotation.y = a;
-      village.add(house);
-      const h = 1.6 + (i % 3) * 0.3;
-      box(house, 1.9, h, 2.2, stone, 0, h / 2, 0);
-      const rg = new THREE.ConeGeometry(1.8, 1.65, 4);
-      rg.rotateY(Math.PI / 4);
-      mesh(house, rg, roof, 0, h + 0.7, 0).scale.z = 1.15;
-      box(house, 0.45, 0.7, 0.09, wood, 0, 0.35, 1.14);
-      for (const x of [-0.58, 0.58]) {
-        box(house, 0.34, 0.43, 0.05, glow, x, h * 0.62, 1.14);
-        box(house, 0.03, 0.46, 0.06, wood, x, h * 0.62, 1.18);
-        box(house, 0.37, 0.03, 0.06, wood, x, h * 0.62, 1.18);
+    scene.fog = new THREE.FogExp2("#101b19", 0.012);
+    scene.environmentIntensity = 0.4;
+    const stone = material("#69766b", 0.85),
+      timber = material("#4c3b29", 0.73),
+      roof = material("#344e48", 0.43, 0.18),
+      brass = material("#b99a5e", 0.33, 0.65),
+      cream = material("#d4c6a0", 0.7),
+      leaves = material("#193c32", 0.9);
+    const grainCanvas = document.createElement("canvas");
+    grainCanvas.width = grainCanvas.height = 256;
+    const gc = grainCanvas.getContext("2d")!;
+    gc.fillStyle = "#8f8f8f";
+    gc.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 100; i++) {
+      const y = i * 2.6;
+      gc.strokeStyle = `rgba(45,45,45,${0.06 + (i % 4) * 0.025})`;
+      gc.lineWidth = 0.6;
+      gc.beginPath();
+      for (let x = 0; x <= 256; x += 4) {
+        const yy = y + Math.sin(x * 0.03 + i) * 1.8;
+        x === 0 ? gc.moveTo(x, yy) : gc.lineTo(x, yy);
       }
-      box(house, 0.28, 0.8, 0.35, stone, 0.5, h + 1, -0.25);
+      gc.stroke();
     }
-    const trees = new THREE.InstancedMesh(
-        new THREE.ConeGeometry(1, 3.5, 32),
-        leaves,
-        156,
-      ),
-      trunks = new THREE.InstancedMesh(
-        new THREE.CylinderGeometry(0.08, 0.16, 2, 8),
-        trunk,
-        52,
+    const grain = new THREE.CanvasTexture(grainCanvas);
+    grain.wrapS = grain.wrapT = THREE.RepeatWrapping;
+    grain.repeat.set(2, 2);
+    timber.bumpMap = grain;
+    timber.bumpScale = 0.025;
+    roof.bumpMap = grain;
+    roof.bumpScale = 0.012;
+    const floor = mesh(
+      scene,
+      new THREE.PlaneGeometry(200, 200),
+      material("#182c24", 0.95),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.75;
+    const island = mesh(
+      scene,
+      new THREE.CylinderGeometry(10.4, 10.1, 0.65, 128),
+      material("#293c32"),
+      0,
+      -0.34,
+      0,
+    );
+    island.receiveShadow = true;
+    mesh(
+      scene,
+      new THREE.TorusGeometry(10.23, 0.045, 10, 160),
+      brass,
+      0,
+      -0.37,
+      0,
+    ).rotation.x = Math.PI / 2;
+    // Every building stays in place; shutters and lights carry the night's consequences.
+    const seamMaterial = material("#52685e", 0.67, 0.1);
+    const homes = houses.map((house, i) => {
+      const angle = -2.45 + (i * 4.9) / 7,
+        r = 7.1;
+      const root = new THREE.Group();
+      root.position.set(Math.sin(angle) * r, 0, -Math.cos(angle) * r);
+      root.rotation.y = -angle;
+      scene.add(root);
+      const h = 1.6 + (i % 3) * 0.24;
+      box(root, 1.8, h, 1.9, stone, 0, h / 2, 0, 0.09);
+      const shape = new THREE.Shape();
+      shape.moveTo(-1.13, 0);
+      shape.lineTo(0, 1.25);
+      shape.lineTo(1.13, 0);
+      shape.closePath();
+      const rg = new THREE.ExtrudeGeometry(shape, {
+        depth: 2.35,
+        bevelEnabled: true,
+        bevelSegments: 3,
+        bevelSize: 0.035,
+        bevelThickness: 0.035,
+      });
+      rg.translate(0, 0, -1.175);
+      mesh(root, rg, roof, 0, h - 0.02, 0);
+      const seams = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(0.018, 0.018, 2.34),
+        seamMaterial,
+        10,
+      );
+      const seamPose = new THREE.Object3D();
+      for (let j = 0; j < 10; j++) {
+        const x = (j - 4.5) * 0.215;
+        seamPose.position.set(
+          x,
+          h + 1.25 * (1 - Math.abs(x) / 1.13) + 0.008,
+          0,
+        );
+        seamPose.updateMatrix();
+        seams.setMatrixAt(j, seamPose.matrix);
+      }
+      root.add(seams);
+      for (const x of [-0.87, 0, 0.87])
+        box(root, 0.055, h, 0.07, timber, x, h / 2, 0.98, 0.012);
+      box(root, 1.85, 0.09, 0.06, timber, 0, 0.12, 0.98);
+      box(root, 0.4, 0.8, 0.07, timber, 0, 0.4, 1.01);
+      ellipsoid(root, brass, 0.12, 0.42, 1.06, 0.035, 0.035, 0.025);
+      box(root, 0.3, 0.9, 0.38, stone, 0.55, h + 0.6, -0.4);
+      const glow = new THREE.MeshStandardMaterial({
+        color: "#ffcf83",
+        emissive: "#ffad40",
+        emissiveIntensity: 1.2,
+        roughness: 0.5,
+      });
+      const shutters: THREE.Group[] = [];
+      for (const x of [-0.56, 0.56]) {
+        box(root, 0.36, 0.48, 0.035, glow, x, h * 0.65, 1.001, 0.01);
+        for (const side of [-1, 1]) {
+          const hinge = new THREE.Group();
+          hinge.position.set(x + side * 0.19, h * 0.65, 1.04);
+          root.add(hinge);
+          box(hinge, 0.18, 0.52, 0.055, timber, -side * 0.09, 0, 0, 0.015);
+          hinge.userData.side = side;
+          shutters.push(hinge);
+        }
+        box(root, 0.025, 0.49, 0.04, brass, x, h * 0.65, 1.034, 0.005);
+      }
+      // Lantern, footing and a continuous little path ground the house in the model.
+      mesh(
+        root,
+        new THREE.CylinderGeometry(0.035, 0.035, 1.1, 12),
+        brass,
+        1.17,
+        0.55,
+        0.85,
+      );
+      const lantern = box(root, 0.2, 0.29, 0.2, glow, 1.17, 1.17, 0.85, 0.025);
+      mesh(
+        root,
+        new THREE.ConeGeometry(0.2, 0.12, 4),
+        brass,
+        1.17,
+        1.38,
+        0.85,
+      ).rotation.y = Math.PI / 4;
+      box(root, 2.05, 0.12, 2.15, material("#536057"), 0, 0.015, 0, 0.06);
+      for (let k = 0; k < 7; k++)
+        box(
+          root,
+          0.48,
+          0.055,
+          0.34,
+          stone,
+          (k % 2) * 0.05,
+          0.035,
+          1.25 + k * 0.39,
+          0.04,
+        );
+      return { root, glow, shutters, lantern };
+    });
+    const treeGeo = new THREE.ConeGeometry(1, 3, 32),
+      trees = new THREE.InstancedMesh(treeGeo, leaves, 90),
+      stems = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(0.09, 0.16, 1.7, 10),
+        timber,
+        30,
       );
     const dummy = new THREE.Object3D();
-    for (let i = 0; i < 52; i++) {
-      const a = i * 2.39996,
-        r = 12 + (i % 8) * 1.4,
-        x = Math.cos(a) * r;
-      let z = Math.sin(a) * r;
-      // Leave an open sightline from the camera to the cards, mask and oracle.
-      if (z > 4 && x > -5 && x < 22) z = -Math.abs(z) - 8;
-      const s = 0.8 + (i % 5) * 0.18;
-      dummy.position.set(x, 1, z);
-      dummy.scale.set(s, s, s);
+    for (let i = 0; i < 30; i++) {
+      const a = -2.1 + (i * 4.2) / 29,
+        r = 12.5 + (i % 4) * 1.25,
+        x = Math.sin(a) * r,
+        z = -Math.cos(a) * r,
+        s = 0.75 + (i % 5) * 0.12;
+      dummy.position.set(x, 0.45, z);
+      dummy.scale.setScalar(s);
       dummy.updateMatrix();
-      trunks.setMatrixAt(i, dummy.matrix);
+      stems.setMatrixAt(i, dummy.matrix);
       for (let j = 0; j < 3; j++) {
-        dummy.position.set(x, 2 + j * 0.85 * s, z);
-        dummy.scale.set(s * (1 - j * 0.17), s, s * (1 - j * 0.17));
+        dummy.position.set(x, 1.4 + j * 0.75 * s, z);
+        dummy.scale.set(s * (1 - j * 0.2), s, s * (1 - j * 0.2));
         dummy.updateMatrix();
         trees.setMatrixAt(i * 3 + j, dummy.matrix);
       }
     }
-    trees.receiveShadow = true;
-    scene.add(trees, trunks);
-    // Cratered moon, with a locally generated surface rather than a remote image.
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 256;
-    const c = canvas.getContext("2d")!;
-    c.fillStyle = "#bdb8a4";
-    c.fillRect(0, 0, 256, 256);
-    let seed = 22;
-    const rand = () => {
-      seed = (seed * 16807) % 2147483647;
-      return seed / 2147483647;
-    };
-    for (let i = 0; i < 180; i++) {
-      const x = rand() * 256,
-        y = rand() * 256,
-        r = rand() * 14 + 1;
-      const g = c.createRadialGradient(x - r * 0.2, y - r * 0.2, 0, x, y, r);
-      g.addColorStop(0, "#77766b");
-      g.addColorStop(0.7, "#a4a391");
-      g.addColorStop(1, "#c2bdab");
-      c.fillStyle = g;
-      c.beginPath();
-      c.arc(x, y, r, 0, Math.PI * 2);
-      c.fill();
-    }
-    const moonTexture = new THREE.CanvasTexture(canvas);
-    const moon = mesh(
-      scene,
-      new THREE.SphereGeometry(5.4, 64, 48),
-      new THREE.MeshStandardMaterial({
-        color: "#ddd3b5",
-        map: moonTexture,
-        bumpMap: moonTexture,
-        bumpScale: 0.16,
-        roughness: 1,
-        emissive: "#a89974",
-        emissiveIntensity: 0.22,
-      }),
-      5,
-      13,
-      -15,
-    );
-    moon.castShadow = false;
-    const stars = new Float32Array(210 * 3);
-    for (let i = 0; i < 210; i++)
-      stars.set(
-        [(rand() - 0.5) * 100, 8 + rand() * 50, (rand() - 0.7) * 90],
-        i * 3,
-      );
-    const sg = new THREE.BufferGeometry();
-    sg.setAttribute("position", new THREE.BufferAttribute(stars, 3));
-    scene.add(
-      new THREE.Points(
-        sg,
-        new THREE.PointsMaterial({
-          color: "#d6d1b5",
-          size: 0.055,
-          transparent: true,
-          opacity: 0.65,
-        }),
-      ),
-    );
-    const firePositions = new Float32Array(55 * 3);
-    for (let i = 0; i < 55; i++)
-      firePositions.set(
-        [(rand() - 0.5) * 18, rand() * 7 + 0.7, (rand() - 0.5) * 18],
-        i * 3,
-      );
-    const fg = new THREE.BufferGeometry();
-    fg.setAttribute("position", new THREE.BufferAttribute(firePositions, 3));
-    const fireflies = new THREE.Points(
-      fg,
-      new THREE.PointsMaterial({
-        color: "#f2bf69",
-        size: 0.065,
-        transparent: true,
-        opacity: 0.7,
-        depthWrite: false,
-      }),
-    );
-    scene.add(fireflies);
-    function cardTexture(type: number) {
-      const cv = document.createElement("canvas");
-      cv.width = 512;
-      cv.height = 768;
-      const ctx = cv.getContext("2d")!;
-      ctx.fillStyle =
-        type === 0 ? "#652e25" : type === 1 ? "#c6b992" : "#293f3a";
-      ctx.fillRect(0, 0, 512, 768);
-      ctx.strokeStyle = type === 1 ? "#33443c" : "#d8bc7e";
-      ctx.fillStyle = ctx.strokeStyle;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(26, 26, 460, 716);
-      ctx.strokeRect(35, 35, 442, 698);
-      ctx.textAlign = "center";
-      ctx.font = "18px Georgia";
-      ctx.fillText("V E I L L É E", 256, 90);
-      ctx.font = "36px Georgia";
-      ctx.fillText(
-        ["THE WEREWOLF", "THE VILLAGER", "THE SEER"][type],
-        256,
-        635,
-      );
-      ctx.font = "13px Georgia";
-      ctx.fillText(
-        ["KEEP YOUR SECRET", "TRUST YOUR INSTINCT", "LOOK A LITTLE CLOSER"][
-          type
+    trees.castShadow = true;
+    scene.add(trees, stems);
+    const starPositions = new Float32Array(160 * 3);
+    for (let i = 0; i < 160; i++)
+      starPositions.set(
+        [
+          Math.sin(i * 123.2) * 45,
+          9 + (i % 23) * 1.4,
+          -18 - Math.abs(Math.cos(i * 63.3)) * 30,
         ],
-        256,
-        677,
+        i * 3,
       );
-      ctx.save();
-      ctx.translate(256, 345);
-      ctx.lineWidth = 3;
-      if (type === 0) {
-        ctx.beginPath();
-        ctx.moveTo(-125, -150);
-        ctx.lineTo(-106, 15);
-        ctx.lineTo(-30, 98);
-        ctx.lineTo(0, 123);
-        ctx.lineTo(30, 98);
-        ctx.lineTo(106, 15);
-        ctx.lineTo(125, -150);
-        ctx.lineTo(54, -77);
-        ctx.lineTo(0, -63);
-        ctx.lineTo(-54, -77);
-        ctx.closePath();
-        ctx.stroke();
-        for (const s of [-1, 1]) {
-          ctx.beginPath();
-          ctx.moveTo(s * 23, 10);
-          ctx.lineTo(s * 73, -10);
-          ctx.lineTo(s * 55, 24);
-          ctx.closePath();
-          ctx.fill();
-        }
-        ctx.beginPath();
-        ctx.moveTo(-18, 79);
-        ctx.lineTo(18, 79);
-        ctx.lineTo(0, 98);
-        ctx.closePath();
-        ctx.fill();
-      } else if (type === 1) {
-        ctx.strokeRect(-75, -20, 150, 140);
-        ctx.beginPath();
-        ctx.moveTo(-110, -20);
-        ctx.lineTo(0, -125);
-        ctx.lineTo(110, -20);
-        ctx.stroke();
-        ctx.strokeRect(-19, 40, 38, 80);
-        ctx.beginPath();
-        ctx.arc(90, -120, 25, 0, Math.PI * 2);
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 136, 66, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(0, 0, 43, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
-        ctx.fill();
-        for (let i = 0; i < 12; i++) {
-          const a = (i / 12) * Math.PI * 2;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a) * 150, Math.sin(a) * 115);
-          ctx.lineTo(Math.cos(a) * 170, Math.sin(a) * 135);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-      const tx = new THREE.CanvasTexture(cv);
-      tx.colorSpace = THREE.SRGBColorSpace;
-      tx.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-      return tx;
-    }
-    const deck = new THREE.Group();
-    scene.add(deck);
-    const cards: THREE.Group[] = [];
-    for (let i = 0; i < 3; i++) {
-      const card = new THREE.Group();
-      card.position.set(
-        (i - 1) * 2.6,
-        i === 1 ? 0.35 : 0,
-        -Math.abs(i - 1) * 0.7,
-      );
-      card.rotation.set(0.04, (i - 1) * -0.2, (i - 1) * -0.14);
-      box(card, 3.65, 5.45, 0.13, copper);
-      const front = mesh(
-        card,
-        new THREE.PlaneGeometry(3.5, 5.3),
-        new THREE.MeshStandardMaterial({
-          map: cardTexture(i),
-          roughness: 0.63,
-        }),
-        0,
-        0,
-        0.076,
-      );
-      front.castShadow = false;
-      deck.add(card);
-      cards.push(card);
-    }
-    // Original cast-bronze wolf mask with actual eye openings and bevelled edges.
-    const mask = new THREE.Group();
-    scene.add(mask);
-    mask.scale.setScalar(1.8);
-    const outline = new THREE.Shape();
-    outline.moveTo(-1.65, 2.4);
-    outline.quadraticCurveTo(-1.4, 0.1, -0.55, -0.7);
-    outline.quadraticCurveTo(0, -1.7, 0.55, -0.7);
-    outline.quadraticCurveTo(1.4, 0.1, 1.65, 2.4);
-    outline.lineTo(0.7, 1.55);
-    outline.quadraticCurveTo(0, 1.75, -0.7, 1.55);
-    outline.closePath();
-    for (const s of [-1, 1]) {
-      const eye = new THREE.Path();
-      eye.absellipse(
-        s * 0.65,
-        0.65,
-        0.35,
-        0.15,
-        0,
-        Math.PI * 2,
-        true,
-        s * -0.28,
-      );
-      outline.holes.push(eye);
-    }
-    mesh(
-      mask,
-      new THREE.ExtrudeGeometry(outline, {
-        depth: 0.26,
-        bevelEnabled: true,
-        bevelThickness: 0.12,
-        bevelSize: 0.1,
-        bevelSegments: 6,
-        curveSegments: 48,
-      }),
-      copper,
+    const starsGeo = new THREE.BufferGeometry();
+    starsGeo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(starPositions, 3),
     );
-    const snout = mesh(
-      mask,
-      new THREE.SphereGeometry(1, 40, 28),
-      copper,
-      0,
-      -0.25,
-      0.27,
-    );
-    snout.scale.set(0.38, 0.64, 0.4);
-    const nose = mesh(
-      mask,
-      new THREE.SphereGeometry(1, 32, 24),
-      wood,
-      0,
-      -0.61,
-      0.62,
-    );
-    nose.scale.set(0.24, 0.14, 0.15);
-    const oracle = new THREE.Group();
-    scene.add(oracle);
-    oracle.scale.setScalar(1.6);
-    mesh(
-      oracle,
-      new THREE.CylinderGeometry(1.25, 1.5, 0.25, 64),
-      copper,
-      0,
-      0,
-      0,
-    );
-    const orb = mesh(
-      oracle,
-      new THREE.SphereGeometry(1.25, 64, 48),
-      new THREE.MeshPhysicalMaterial({
-        color: "#82b7a9",
-        roughness: 0.13,
-        metalness: 0.25,
-        clearcoat: 1,
-        emissive: "#2c796e",
-        emissiveIntensity: 0.2,
-      }),
-      0,
-      1.35,
-      0,
-    );
-    const orbit = mesh(
-      oracle,
-      new THREE.TorusGeometry(1.65, 0.025, 10, 96),
-      copper,
-      0,
-      1.35,
-      0,
-    );
-    orbit.rotation.x = 1.1;
+    const starMat = new THREE.PointsMaterial({
+      color: "#d9d6bb",
+      size: 0.055,
+      transparent: true,
+      opacity: 0.65,
+      depthWrite: false,
+    });
+    scene.add(new THREE.Points(starsGeo, starMat));
     const table = new THREE.Group();
+    table.position.z = 1.2;
     scene.add(table);
     mesh(
       table,
-      new THREE.CylinderGeometry(2.7, 2.7, 0.22, 64),
-      wood,
+      new THREE.CylinderGeometry(3.15, 3.15, 0.22, 96),
+      timber,
       0,
-      1.2,
+      1.28,
       0,
     );
     mesh(
       table,
-      new THREE.CylinderGeometry(0.7, 1.25, 1.2, 48),
-      wood,
+      new THREE.CylinderGeometry(0.8, 1.2, 1.18, 48),
+      timber,
       0,
-      0.5,
+      0.59,
       0,
     );
-    const flames: THREE.Mesh[] = [];
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2;
+    mesh(
+      table,
+      new THREE.TorusGeometry(3.08, 0.045, 12, 128),
+      brass,
+      0,
+      1.4,
+      0,
+    ).rotation.x = Math.PI / 2;
+    const seats = houses.map((_, i) => {
+      const a = (i / 8) * Math.PI * 2;
+      const root = new THREE.Group();
+      root.position.set(Math.sin(a) * 2.32, 1.4, Math.cos(a) * 2.32);
+      root.rotation.y = a;
+      table.add(root);
+      const mat = material(i === 7 ? "#7daba1" : "#b5b59a", 0.42, 0.2);
       mesh(
-        table,
-        new THREE.CylinderGeometry(0.12, 0.14, 0.55, 20),
-        cream,
-        Math.sin(a) * 2.05,
-        1.6,
-        Math.cos(a) * 2.05,
+        root,
+        new THREE.CylinderGeometry(0.12, 0.24, 0.45, 32),
+        mat,
+        0,
+        0.225,
+        0,
       );
-      const flame = mesh(
-        table,
-        new THREE.SphereGeometry(0.1, 16, 12),
-        glow,
-        Math.sin(a) * 2.05,
-        1.95,
-        Math.cos(a) * 2.05,
+      ellipsoid(root, mat, 0, 0.59, 0, 0.18, 0.18, 0.18);
+      mesh(
+        root,
+        new THREE.CylinderGeometry(0.28, 0.29, 0.06, 32),
+        brass,
+        0,
+        0.03,
+        0,
       );
-      flame.scale.y = 1.9;
-      flames.push(flame);
+      const token = mesh(
+        table,
+        new THREE.CylinderGeometry(0.14, 0.14, 0.045, 32),
+        brass,
+        Math.sin(a) * 2.7,
+        1.425,
+        Math.cos(a) * 2.7,
+      );
+      return { root, token, a, mat };
+    });
+    const deck = new THREE.Group();
+    deck.position.set(0, 1.46, 1.2);
+    scene.add(deck);
+    const cards = Array.from({ length: 3 }, (_, i) => {
+      const root = new THREE.Group();
+      deck.add(root);
+      box(root, 2.1, 3.12, 0.085, brass, 0, 0, 0, 0.06);
+      const face = mesh(
+        root,
+        new THREE.PlaneGeometry(2.01, 3.02),
+        new THREE.MeshStandardMaterial({
+          map: cardTexture(i, renderer),
+          roughness: 0.7,
+        }),
+        0,
+        0,
+        0.047,
+      );
+      face.castShadow = false;
+      const back = mesh(
+        root,
+        new THREE.PlaneGeometry(2.01, 3.02),
+        material("#28483e", 0.65),
+        0,
+        0,
+        -0.047,
+      );
+      back.rotation.y = Math.PI;
+      const backRing = mesh(
+        root,
+        new THREE.TorusGeometry(0.48, 0.015, 8, 64),
+        brass,
+        0,
+        0,
+        -0.05,
+      );
+      backRing.rotation.y = Math.PI;
+      return root;
+    });
+    const wolf = makeWolf();
+    scene.add(wolf.root);
+    const wolfMaterials = new Set<THREE.Material>();
+    wolf.root.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        const mat = object.material as THREE.Material;
+        mat.transparent = true;
+        wolfMaterials.add(mat);
+      }
+    });
+    wolf.root.scale.setScalar(1.25);
+    const lens = new THREE.Group();
+    lens.position.set(-2.7, 1.4, 1.1);
+    scene.add(lens);
+    mesh(
+      lens,
+      new THREE.CylinderGeometry(0.52, 0.62, 0.14, 48),
+      brass,
+      0,
+      0,
+      0,
+    );
+    const orb = ellipsoid(
+      lens,
+      new THREE.MeshPhysicalMaterial({
+        color: "#7dc6ba",
+        metalness: 0.3,
+        roughness: 0.12,
+        clearcoat: 1,
+        emissive: "#2c716b",
+        emissiveIntensity: 0.3,
+      }),
+      0,
+      0.55,
+      0,
+      0.48,
+      0.48,
+      0.48,
+    );
+    const orbit = mesh(
+      lens,
+      new THREE.TorusGeometry(0.62, 0.018, 10, 64),
+      brass,
+      0,
+      0.55,
+      0,
+    );
+    orbit.rotation.x = 1.1;
+    function marker(color: string, radius: number) {
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const ring = mesh(
+        scene,
+        new THREE.RingGeometry(radius, radius + 0.055, 96),
+        mat,
+        0,
+        0.12,
+        0,
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.castShadow = false;
+      return ring;
     }
+    const huntRing = marker("#dc9566", 1.65),
+      seerRing = marker("#9de3ce", 1.75),
+      voteRing = marker("#e1c48b", 1.65);
+    const choicePositions = [
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+    ];
+    [victim, vision, accused].forEach((v, i) =>
+      choicePositions[i].copy(homes[v].root.position),
+    );
+    const guestLights = Array.from({ length: 18 }, (_, i) => {
+      const a = (i / 18) * Math.PI * 2,
+        mat = new THREE.MeshStandardMaterial({
+          color: "#edc381",
+          emissive: "#e8a252",
+          emissiveIntensity: 0.2,
+          roughness: 0.5,
+        });
+      return mesh(
+        scene,
+        new THREE.SphereGeometry(0.1, 16, 12),
+        mat,
+        Math.sin(a) * 9.65,
+        0.13,
+        Math.cos(a) * 9.65,
+      );
+    });
     const cameraKeys = [
-      [19, 12, 29, -5, 4, 0],
-      [18, 22, 29, -3, 0, 0],
-      [13, 9, 24, -4, 4, 0],
-      [6, 5, 22, -3, 2, -3],
-      [12, 7, 24, -4, 4, 0],
-      [13, 8, 23, -4, 4, 0],
-      [15, 13, 23, -4, 1, 0],
-      [10, 8, 22, -3, 1, 0],
-      [18, 19, 30, -4, 1, 0],
-      [17, 11, 28, -5, 3, 0],
+      [23, 26, 35, 0, 1, 0],
+      [18, 28, 30, 0, 0, 0],
+      [7, 9, 18, 0, 2.7, 1.2],
+      [10, 18, 27, 0, 1.3, -1],
+      [12, 9, 23, 2, 1.7, 6.7],
+      [8, 18, 25, 0, 1, 0],
+      [18, 25, 29, 0, 1, 0],
+      [7, 12, 17, 0, 1.5, 1.2],
+      [6, 10, 17, 0, 1.5, 1.2],
+      [24, 28, 35, 0, 1, 0],
     ];
-    const deckKeys = [
-      [3.5, 5.7, 3, 0.65],
-      [12, -8, 0, 0],
-      [3.5, 5.7, 3, 0.65],
-      [13, -8, 0, 0],
-      [13, -8, 0, 0],
-      [13, -8, 0, 0],
-      [13, -8, 0, 0],
-      [13, -8, 0, 0],
-      [13, -8, 0, 0],
-      [4, 5.7, 3, 0.65],
+    const mobileDistances = [
+      [59],
+      [58],
+      [29],
+      [49],
+      [29],
+      [51],
+      [57],
+      [29],
+      [28],
+      [59],
     ];
-    const maskKeys = Array.from({ length: 10 }, (_, i) => [
-      i === 4 ? 3 : 12,
-      i === 4 ? 5 : -9,
-      4,
-    ]);
-    const orbKeys = Array.from({ length: 10 }, (_, i) => [
-      i === 5 ? 3 : 12,
-      i === 5 ? 3 : -9,
-      3,
-    ]);
-    const target = new THREE.Vector3(),
-      nightColor = new THREE.Color("#101b19"),
-      dawnColor = new THREE.Color("#43483c");
+    const look = new THREE.Vector3(),
+      eyeDirection = new THREE.Vector3();
+    const moonlight = new THREE.Color("#f5e2c4"),
+      sunlight = new THREE.Color("#ffe0a6");
+    const nightColor = new THREE.Color("#101e1a"),
+      dawnColor = new THREE.Color("#39473c"),
+      morningColor = new THREE.Color("#59604c");
     function render(now: number) {
       if (disposed || document.hidden) return;
-      const dt = Math.min(0.04, (now - last) / 1000);
+      const dt = Math.min(0.064, (now - last) / 1000);
       last = now;
       if (!state.current.paused && !reduced.matches) elapsed += dt;
-      scroll = THREE.MathUtils.damp(
-        scroll,
-        progress.current,
-        reduced.matches ? 100 : 7,
-        dt,
-      );
-      const k = interpolate(cameraKeys, scroll);
-      const distance = mobile.matches ? 1.45 : 1;
-      camera.position.set(k[0] * distance, k[1] * distance, k[2] * distance);
-      target.set(mobile.matches ? 0 : k[3], k[4], k[5]);
-      camera.lookAt(target);
-      const d = interpolate(deckKeys, scroll);
-      deck.position.set(d[0], d[1] + Math.sin(elapsed * 0.6) * 0.13, d[2]);
-      deck.rotation.y = d[3];
+      scroll = reduced.matches
+        ? progress.current
+        : THREE.MathUtils.damp(scroll, progress.current, 10, dt);
+      const s = state.current,
+        n = nightAt(scroll),
+        k = interpolate(cameraKeys, scroll);
+      look.set(k[3], k[4], k[5]);
+      camera.position.set(k[0], k[1], k[2]);
+      if (mobile.matches) {
+        eyeDirection.copy(camera.position).sub(look).normalize();
+        const distance =
+          interpolate(mobileDistances, scroll)[0] *
+          Math.max(1, 0.48 / camera.aspect);
+        camera.position.copy(look).addScaledVector(eyeDirection, distance);
+      }
+      camera.lookAt(look);
+      homes.forEach((home, i) => {
+        const brightness = windowLight(scroll, i, s.victim, s.accused);
+        home.glow.emissiveIntensity = THREE.MathUtils.damp(
+          home.glow.emissiveIntensity,
+          0.035 + brightness * 1.65,
+          8,
+          dt,
+        );
+        home.glow.color.setRGB(
+          0.15 + brightness * 0.85,
+          0.12 + brightness * 0.5,
+          0.07 + brightness * 0.18,
+        );
+        const closed =
+          n.asleep * (1 - n.dawn) +
+          (i === s.victim ? n.loss * n.dawn : 0) +
+          (i === s.accused ? n.verdict : 0);
+        home.shutters.forEach((shutter) => {
+          shutter.rotation.y = THREE.MathUtils.damp(
+            shutter.rotation.y,
+            shutter.userData.side * (1 - Math.min(1, closed)) * 2.55,
+            9,
+            dt,
+          );
+        });
+      });
       cards.forEach((card, i) => {
-        const order = (i - state.current.role + 3) % 3;
-        const side = order === 0 ? 0 : order === 1 ? 1 : -1;
+        const selected = i === s.role;
+        const side = selected ? 0 : (i - s.role + 3) % 3 === 1 ? 1 : -1;
+        const fan = n.deal * (1 - n.fold);
         card.position.x = THREE.MathUtils.damp(
           card.position.x,
-          side * 2.6,
-          6,
+          side * 1.5 * fan,
+          8,
           dt,
         );
-        card.position.y = THREE.MathUtils.damp(
-          card.position.y,
-          side ? 0 : 0.35,
-          6,
-          dt,
-        );
-        card.position.z = THREE.MathUtils.damp(
-          card.position.z,
-          side ? -0.7 : 0.4,
-          6,
-          dt,
-        );
-        card.rotation.z = THREE.MathUtils.damp(
-          card.rotation.z,
-          -side * 0.14,
-          6,
-          dt,
-        );
+        card.position.y =
+          i * 0.09 * (1 - fan) +
+          (1.8 + (selected ? 0.22 : 0)) * Math.sin((fan * Math.PI) / 2);
+        card.position.z = (selected ? 0.28 : -0.4) * fan;
+        card.rotation.x =
+          -Math.PI / 2 + (n.deal * Math.PI) / 2 + (n.fold * Math.PI) / 2;
         card.rotation.y = THREE.MathUtils.damp(
           card.rotation.y,
-          -side * 0.2 + Math.sin(elapsed * 0.4 + i) * 0.035,
-          6,
+          -side * 0.2 * fan,
+          8,
+          dt,
+        );
+        card.rotation.z = -side * 0.13 * fan;
+      });
+      // A single route through the village. No teleport, repeated descent or reset.
+      wolf.root.position.set(
+        -30 + n.hunt * 32 + n.retreat * 22,
+        0,
+        7.5 + Math.sin(n.retreat * Math.PI) * 4 - n.retreat * 10,
+      );
+      const wolfPresence =
+        cue(n.hunt, 0.58, 0.86) * (1 - cue(n.retreat, 0.7, 1));
+      wolfMaterials.forEach((mat) => {
+        mat.opacity = wolfPresence;
+        mat.depthWrite = wolfPresence > 0.98;
+      });
+      wolf.root.visible = wolfPresence > 0.00001;
+      wolf.root.position.y =
+        -0.75 *
+        cue(Math.hypot(wolf.root.position.x, wolf.root.position.z), 10.4, 11.1);
+      wolf.root.rotation.y = -0.08 + n.retreat * 0.7;
+      const walking =
+        Math.sin(Math.PI * n.hunt) + Math.sin(Math.PI * n.retreat);
+      const stride = (n.hunt * 15 + n.retreat * 16) * 2.6;
+      wolf.legs.forEach(
+        (leg, i) =>
+          (leg.rotation.z =
+            Math.sin(stride + (i === 0 || i === 3 ? 0 : Math.PI)) *
+            0.27 *
+            walking),
+      );
+      wolf.torso.scale.y =
+        0.55 + (reduced.matches ? 0 : Math.sin(elapsed * 1.4) * 0.008);
+      wolf.head.rotation.y = -0.12 + Math.sin(elapsed * 0.4) * 0.025;
+      wolf.tail.rotation.x = Math.sin(elapsed * 0.7) * 0.035;
+      orbit.rotation.z = elapsed * 0.12;
+      (orb.material as THREE.MeshPhysicalMaterial).emissiveIntensity =
+        0.16 + n.vision * 0.85;
+      const ids = [s.victim, s.vision, s.accused],
+        rings = [huntRing, seerRing, voteRing],
+        weights = [
+          n.hunt * (1 - n.loss) * 0.85,
+          n.vision * 0.9,
+          n.vote * (1 - n.verdict) * 0.9,
+        ];
+      rings.forEach((ring, i) => {
+        choicePositions[i].lerp(
+          homes[ids[i]].root.position,
+          1 - Math.exp(-7 * dt),
+        );
+        ring.position.set(choicePositions[i].x, 0.13, choicePositions[i].z);
+        (ring.material as THREE.MeshBasicMaterial).opacity = weights[i];
+      });
+      seats.forEach((seat, i) => {
+        const leave =
+          (i === s.victim ? n.loss : 0) + (i === s.accused ? n.verdict : 0);
+        seat.root.rotation.x = THREE.MathUtils.damp(
+          seat.root.rotation.x,
+          (Math.min(1, leave) * Math.PI) / 2,
+          8,
+          dt,
+        );
+        seat.root.position.y = 1.4 + Math.sin(seat.root.rotation.x) * 0.3;
+        const a = seats[s.accused].a,
+          voteWeight = n.vote * (i === s.victim ? 0 : 1);
+        const x = Math.sin(a) * 1.6 + (i - 3.5) * 0.13,
+          z = Math.cos(a) * 1.6 + (i % 2) * 0.16;
+        seat.token.position.x = THREE.MathUtils.damp(
+          seat.token.position.x,
+          Math.sin(seat.a) * 2.7 * (1 - voteWeight) + x * voteWeight,
+          7,
+          dt,
+        );
+        seat.token.position.z = THREE.MathUtils.damp(
+          seat.token.position.z,
+          Math.cos(seat.a) * 2.7 * (1 - voteWeight) + z * voteWeight,
+          7,
           dt,
         );
       });
-      const m = interpolate(maskKeys, scroll);
-      mask.position.set(m[0], m[1] + Math.sin(elapsed * 0.7) * 0.14, m[2]);
-      mask.rotation.set(0.02, 0.42 + Math.sin(elapsed * 0.3) * 0.1, 0);
-      const o = interpolate(orbKeys, scroll);
-      oracle.position.set(o[0], o[1], o[2]);
-      orb.position.y = 1.35 + Math.sin(elapsed * 0.8) * 0.07;
-      orbit.rotation.z = elapsed * 0.12;
-      flames.forEach(
-        (f, i) => (f.scale.y = 1.9 + Math.sin(elapsed * 3 + i) * 0.2),
-      );
-      fireflies.rotation.y = elapsed * 0.015;
-      const dawn =
-        THREE.MathUtils.smoothstep(scroll, 7, 8) *
-        (1 - THREE.MathUtils.smoothstep(scroll, 8.5, 9));
-      (scene.background as THREE.Color).copy(nightColor).lerp(dawnColor, dawn);
+      guestLights.forEach((light, i) => {
+        const mat = light.material as THREE.MeshStandardMaterial;
+        mat.emissiveIntensity = THREE.MathUtils.damp(
+          mat.emissiveIntensity,
+          i < s.players ? 0.3 + n.sunrise * 0.7 : 0.01,
+          7,
+          dt,
+        );
+      });
+      (scene.background as THREE.Color)
+        .copy(nightColor)
+        .lerp(dawnColor, n.dawn)
+        .lerp(morningColor, n.sunrise * 0.6);
       (scene.fog as THREE.FogExp2).color.copy(scene.background as THREE.Color);
-      hemi.intensity = 1.4 + dawn * 1.8;
-      key.intensity = 3.8 + dawn * 1.4;
-      moon.position.y = 13 - dawn * 7;
+      hemi.intensity = 1.35 + n.dawn * 0.7 + n.sunrise * 0.3;
+      key.intensity = 3.4 + n.dawn * 0.9;
+      key.color.copy(moonlight).lerp(sunlight, n.dawn);
+      fill.intensity = 1.4 + n.dawn * 0.3;
+      starMat.opacity = 0.65 * (1 - n.dawn);
       renderer.render(scene, camera);
       frame = requestAnimationFrame(render);
     }

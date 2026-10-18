@@ -7,7 +7,7 @@ window.PROJECTS = [
     direction: "After-dark storytelling",
     group: "immersive",
     description:
-      "A candlelit village, secret role cards and a bronze wolf mask. Follow ten immersive chapters from dusk to sunrise, explore the roles and prepare your next game night.",
+      "One village. One night. Choose a target, uncover a secret and cast your vote as a sculpted Werewolf story unfolds over ten immersive chapters.",
     short: "Trust no one. Play together.",
     type: "Bodoni Moda, Manrope",
     signature: "Ten WebGL chapters, secret roles and a printable host guide",

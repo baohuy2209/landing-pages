@@ -4,7 +4,7 @@ An imaginary chess club, presented as a sculptural editorial journey. Ivory, gra
 
 Step through the first six plies of the Italian Game (`1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5`), go backwards, reset the board or download the opening as a PGN. This is an interactive study, not a chess engine or multiplayer game.
 
-The journey spans 21 viewport heights. All 32 pieces are original procedural models, with smooth profiles, bevelled details, studio lighting and continuous scroll transitions. Mobile uses its own framing.
+The journey spans 21 viewport heights. The complete board stays assembled while separate, original sculptures glide through the six piece studies. Smooth profiles, real bevelled notches and grounded contact shadows give the pieces a tactile finish. Opening moves follow interruptible arcs, including when stepping backwards or resetting mid-move. Mobile uses its own framing.
 
 ## Development
 

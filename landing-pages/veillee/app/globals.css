@@ -1023,3 +1023,133 @@ footer p em {
 .current-chapter > span {
   animation: label-in 0.4s both;
 }
+
+/* Choices belong to the story; each response is readable without WebGL. */
+.story-choice {
+  margin-top: 24px;
+  max-width: 430px;
+}
+.choice-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 10px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.story-choice [role="group"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.story-choice button {
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 0 14px;
+  height: 42px;
+  transition:
+    background 0.3s,
+    color 0.3s,
+    border-color 0.3s;
+}
+.story-choice button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #15241e;
+}
+.story-choice p {
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 14px 0 8px;
+  animation: story-answer 0.4s ease both;
+}
+.story-choice small {
+  color: #b3b7a5;
+  font-size: 10px;
+}
+.story-result {
+  display: flex;
+  gap: 12px;
+  max-width: 390px;
+  margin-top: 25px;
+  padding-top: 18px;
+  border-top: 1px solid #d1bd8d40;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.story-result svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--accent);
+}
+.story-result strong {
+  display: block;
+  color: var(--accent);
+  font-weight: 400;
+}
+@keyframes story-answer {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 760px) {
+  .story-choice {
+    margin-top: 16px;
+    max-width: 360px;
+  }
+  .story-choice button {
+    font-size: 11px;
+    padding: 0 11px;
+    min-height: 40px;
+  }
+  .story-choice p {
+    font-size: 11px;
+    margin: 9px 0 4px;
+  }
+  .story-choice small {
+    font-size: 9px;
+  }
+  .story-result {
+    margin-top: 14px;
+    padding-top: 12px;
+    font-size: 12px;
+  }
+  .chapter:has(.story-choice) .description {
+    font-size: 12px;
+    max-width: 310px;
+  }
+  .chapter:has(.story-choice) h2 {
+    font-size: clamp(34px, 9vw, 46px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-choice p {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) and (max-height: 740px) {
+  .story-choice small {
+    display: none;
+  }
+  .story-choice p {
+    max-width: 290px;
+  }
+  .vignette {
+    background: linear-gradient(
+      180deg,
+      #101b19db,
+      #101b19b8 43%,
+      #101b1933 61%,
+      transparent 70%,
+      #101b1940
+    );
+  }
+}

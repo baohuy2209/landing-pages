@@ -1,10 +1,10 @@
 # Veillée
 
-An original, fictional Werewolf game night. A miniature forest village, illustrated role cards, a bronze wolf mask and a seer’s orb carry a ten-chapter journey from dusk to sunrise.
+An original, fictional Werewolf game night. One miniature village carries a ten-chapter journey from dusk to sunrise: roles are dealt once, shutters close, a sculpted wolf arrives, the seer looks behind a door, and the village votes.
 
-Explore three roles, draw a sample secret identity and prepare a printable moderator guide for 8–18 players plus one moderator. These are local demonstrations of our introductory variant, not an online multiplayer game or an official edition.
+Choose the wolves’ target, inspect an identity and cast a vote. Lights go out, tokens gather and eliminated figures remain on the table. Scrolling backwards retraces the same round. Prepare a printable moderator guide for 8–18 players plus one moderator. This is a local illustrated story, not an online multiplayer game or an official edition.
 
-The journey spans 21 viewport heights, with continuous camera and object transitions. Mobile uses a dedicated composition and a capped render resolution.
+The journey spans 21 viewport heights. Cameras, shutters, cards and lighting follow continuous scroll transitions. Mobile uses dedicated camera distances, a clear reading area and capped render resolution.
 
 ## Development
 

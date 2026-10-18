@@ -6,12 +6,13 @@ import {
   ArrowLeft,
   ArrowRight,
   Moon,
-  Sun,
   Waves,
   Wind,
   Menu,
   Download,
   Eye,
+  Flame,
+  Vote,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { useJourney } from "@/lib/use-journey";
 import { download } from "@/lib/journey";
+import { houses } from "@/lib/story";
 import { roles, party, hostGuide } from "@/lib/game";
 const World = dynamic(() => import("./world"), { ssr: false });
 const chapters = [
@@ -87,12 +89,12 @@ const chapters = [
     eyebrow: "04 / A DIFFERENT KIND OF TEAMWORK",
     title: (
       <>
-        Keep your friends
+        One house.
         <br />
-        <em>guessing.</em>
+        <em>No witnesses.</em>
       </>
     ),
-    copy: "The pack chooses together, in silence. When morning comes, the best disguise is a perfectly reasonable explanation.",
+    copy: "A shape slips out of the trees. The pack wakes and silently chooses one player. Which window will go dark?",
   },
   {
     label: "The seer",
@@ -118,7 +120,7 @@ const chapters = [
         <em>A long discussion.</em>
       </>
     ),
-    copy: "The moderator tells the village what happened. Listen to the stories. Remember the details. Ask the question no one else is asking.",
+    copy: "The shutters open. One lantern doesn’t. The moderator announces the night’s victim; the village starts to question every alibi.",
   },
   {
     label: "The vote",
@@ -131,24 +133,24 @@ const chapters = [
         <em>you believe?</em>
       </>
     ),
-    copy: "The village votes. One player leaves the circle. Then the night returns, and the story grows another layer.",
+    copy: "Suspicion becomes a name. Choose a suspect and watch the tokens gather. A majority can be convincing. It can also be wrong.",
   },
   {
-    label: "After the game",
+    label: "The verdict",
     time: "SUNRISE / 06:34",
-    eyebrow: "08 / LEAVE THE SUSPICION AT THE TABLE",
+    eyebrow: "08 / THE TRUTH, A LITTLE TOO LATE",
     title: (
       <>
-        Enemies tonight.
+        A vote is cast.
         <br />
-        <em>Friends tomorrow.</em>
+        <em>A secret falls.</em>
       </>
     ),
-    copy: "The best part is the conversation afterwards. The impossible bluff. The one clue you missed. The person you should never have trusted.",
+    copy: "The accused leaves the circle and reveals their role. The empty places remain. This round ends here; your next game writes the rest.",
   },
   {
     label: "Your next night",
-    time: "ANOTHER EVENING / SOON",
+    time: "DAYBREAK / 07:00",
     eyebrow: "09 / MAKE A LITTLE ROOM FOR MYSTERY",
     title: (
       <>
@@ -166,7 +168,9 @@ export default function Experience() {
   const [open, setOpen] = useState(false),
     [role, setRole] = useState(0),
     [players, setPlayers] = useState(10),
-    [secret, setSecret] = useState<number | null>(null);
+    [victim, setVictim] = useState(0),
+    [vision, setVision] = useState(4),
+    [accused, setAccused] = useState(4);
   const setup = party(players);
   function toggle() {
     j.setPaused(!j.paused);
@@ -196,6 +200,10 @@ export default function Experience() {
           progress={j.progress}
           paused={j.paused}
           role={role}
+          victim={victim}
+          vision={vision}
+          accused={accused}
+          players={players}
           onReady={j.onReady}
         />
       )}
@@ -323,34 +331,88 @@ export default function Experience() {
                     </p>
                   </div>
                 )}
-                {i === 3 && (
-                  <div className="secret">
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        setSecret(Math.floor(Math.random() * roles.length))
+                {(i === 4 || i === 5 || i === 7) && (
+                  <div className="story-choice">
+                    <span className="choice-label">
+                      {i === 4 ? (
+                        <Flame size={14} />
+                      ) : i === 5 ? (
+                        <Eye size={14} />
+                      ) : (
+                        <Vote size={14} />
+                      )}
+                      {i === 4
+                        ? "Mark a house"
+                        : i === 5
+                          ? "Look behind a door"
+                          : "Cast the village’s vote"}
+                    </span>
+                    <div
+                      role="group"
+                      aria-label={
+                        i === 4
+                          ? "Choose the wolves’ target"
+                          : i === 5
+                            ? "Choose the seer’s vision"
+                            : "Choose a suspect"
                       }
                     >
-                      <Eye size={17} />
-                      {secret === null
-                        ? "Draw a secret role"
-                        : "Draw another role"}
-                    </Button>
-                    {secret !== null && (
-                      <p aria-live="polite">
-                        Your role: <strong>{roles[secret].name}.</strong> Keep a
-                        straight face.
-                        <br />
-                        <small>A little preview, not a live game.</small>
-                      </p>
-                    )}
+                      {(i === 4 ? [0, 2, 5] : [1, 4, 6]).map((id) => (
+                        <Button
+                          key={id}
+                          variant="outline"
+                          aria-pressed={
+                            (i === 4 ? victim : i === 5 ? vision : accused) ===
+                            id
+                          }
+                          onClick={() =>
+                            (i === 4
+                              ? setVictim
+                              : i === 5
+                                ? setVision
+                                : setAccused)(id)
+                          }
+                        >
+                          {houses[id].name}
+                        </Button>
+                      ))}
+                    </div>
+                    <p
+                      aria-live="polite"
+                      key={i === 4 ? victim : i === 5 ? vision : accused}
+                    >
+                      {i === 4
+                        ? `${houses[victim].name} is marked. Its light will be missing at dawn.`
+                        : i === 5
+                          ? `${houses[vision].name}: ${houses[vision].role.toLowerCase()}. One secret is yours to keep.`
+                          : `The tokens gather around ${houses[accused].name.toLowerCase()}. Scroll to hear the verdict.`}
+                    </p>
+                    <small>
+                      An illustrated round. Your choices shape this story.
+                    </small>
                   </div>
                 )}
-                {i === 7 && (
-                  <p className="quote">
-                    “You’re being unusually quiet.”
-                    <br />
-                    <em>— Someone who is definitely a wolf.</em>
+                {i === 6 && (
+                  <p className="story-result">
+                    <Flame size={18} />
+                    <span>
+                      <strong>{houses[victim].name} is dark.</strong> One
+                      villager has left the circle. Their token stays down.
+                    </span>
+                  </p>
+                )}
+                {i === 8 && (
+                  <p className="story-result" aria-live="polite">
+                    <Eye size={18} />
+                    <span>
+                      <strong>
+                        {houses[accused].name}:{" "}
+                        {houses[accused].role.toLowerCase()}.
+                      </strong>
+                      {houses[accused].role === "Werewolf"
+                        ? " A wolf is out. But another is still listening."
+                        : " An innocent leaves the table. The wolves keep their secret."}
+                    </span>
                   </p>
                 )}
                 {i === 9 && (
