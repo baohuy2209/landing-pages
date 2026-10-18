@@ -9,7 +9,7 @@ const source = await readFile(
 const js = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext },
 }).outputText;
-const { nightAt, windowLight } = await import(
+const { nightAt, windowLight, wolfAt, roundResult } = await import(
   `data:text/javascript;base64,${Buffer.from(js).toString("base64")}`
 );
 test("one distribution only; cards remain face down after the night begins", () => {
@@ -44,4 +44,36 @@ test("sunrise never reverses into another night", () => {
     previous = n.dawn;
   }
   assert.equal(nightAt(9).sunrise, 1);
+});
+
+test("the wolf enters once and leaves continuously, without reversing or teleporting", () => {
+  assert.equal(wolfAt(3).visible, false);
+  assert.equal(wolfAt(4).visible, true);
+  assert.equal(wolfAt(5.2).visible, false);
+  assert.ok(wolfAt(3).x < -40);
+  assert.ok(wolfAt(5.2).x > 40);
+  let previous = wolfAt(0);
+  for (let p = 0.001; p < 9; p += 0.001) {
+    const next = wolfAt(p);
+    assert.ok(next.x >= previous.x);
+    assert.ok(
+      Math.hypot(
+        next.x - previous.x,
+        next.y - previous.y,
+        next.z - previous.z,
+      ) < 0.2,
+    );
+    assert.ok(next.y >= -0.75 && next.y <= 0);
+    previous = next;
+  }
+});
+test("the verdict accounts for the night victim and either an innocent or a wolf", () => {
+  for (const victim of [0, 2, 5]) {
+    assert.deepEqual(roundResult(victim, 1), { remaining: 6, wolves: 2 });
+    for (const accused of [4, 6])
+      assert.deepEqual(roundResult(victim, accused), {
+        remaining: 6,
+        wolves: 1,
+      });
+  }
 });

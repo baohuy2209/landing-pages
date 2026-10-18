@@ -60,8 +60,9 @@ export function useJourney() {
         const reveal = enter * leave;
         s.style.setProperty("--reveal", String(reveal));
         const copy = copies[i];
-        if (copy) copy.inert = reveal < 0.01;
-        s.style.setProperty("--lift", `${(1 - enter) * 30}px`);
+        const hidden = reveal < 0.01;
+        if (copy && copy.inert !== hidden) copy.inert = hidden;
+        s.style.setProperty("--lift", `${(1 - enter) * 12}px`);
       });
     };
     const queue = () => {

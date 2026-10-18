@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { makeStage } from "@/lib/stage";
 import { interpolate } from "@/lib/journey";
-import { houses, nightAt, windowLight, cue } from "@/lib/story";
+import { houses, nightAt, windowLight, cue, wolfAt } from "@/lib/story";
 import {
   material,
   mesh,
@@ -208,7 +208,16 @@ export default function World({
         );
       return { root, glow, shutters, lantern };
     });
-    const treeGeo = new THREE.ConeGeometry(1, 3, 32),
+    const treeProfile = new THREE.SplineCurve([
+      new THREE.Vector2(0.05, -1.5),
+      new THREE.Vector2(0.86, -1.4),
+      new THREE.Vector2(1, -1.27),
+      new THREE.Vector2(0.84, -1.08),
+      new THREE.Vector2(0.52, -0.35),
+      new THREE.Vector2(0.23, 0.5),
+      new THREE.Vector2(0, 1.5),
+    ]);
+    const treeGeo = new THREE.LatheGeometry(treeProfile.getPoints(36), 40),
       trees = new THREE.InstancedMesh(treeGeo, leaves, 90),
       stems = new THREE.InstancedMesh(
         new THREE.CylinderGeometry(0.09, 0.16, 1.7, 10),
@@ -317,8 +326,10 @@ export default function World({
         1.425,
         Math.cos(a) * 2.7,
       );
-      return { root, token, a, mat };
+      return { root, token, a, mat, baseColor: mat.color.clone() };
     });
+    const wolfColor = new THREE.Color("#c86f50"),
+      villageColor = new THREE.Color("#b2d6b9");
     const deck = new THREE.Group();
     deck.position.set(0, 1.46, 1.2);
     scene.add(deck);
@@ -360,14 +371,6 @@ export default function World({
     });
     const wolf = makeWolf();
     scene.add(wolf.root);
-    const wolfMaterials = new Set<THREE.Material>();
-    wolf.root.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        const mat = object.material as THREE.Material;
-        mat.transparent = true;
-        wolfMaterials.add(mat);
-      }
-    });
     wolf.root.scale.setScalar(1.25);
     const lens = new THREE.Group();
     lens.position.set(-2.7, 1.4, 1.1);
@@ -428,6 +431,44 @@ export default function World({
     const huntRing = marker("#dc9566", 1.65),
       seerRing = marker("#9de3ce", 1.75),
       voteRing = marker("#e1c48b", 1.65);
+    // Small in-scene labels connect a named choice to the actual house.
+    const labels = ["MARKED", "SEEN", "ACCUSED"].map(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = 160;
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          depthTest: false,
+        }),
+      );
+      sprite.scale.set(3.8, 0.95, 1);
+      sprite.renderOrder = 20;
+      scene.add(sprite);
+      return { canvas, texture, sprite, text: "" };
+    });
+    const beam = mesh(
+      scene,
+      new THREE.CylinderGeometry(0.012, 0.012, 1, 8),
+      new THREE.MeshBasicMaterial({
+        color: "#9de3ce",
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      }),
+    );
+    beam.castShadow = beam.receiveShadow = false;
+    const beamStart = new THREE.Vector3(-2.7, 1.95, 1.1),
+      beamEnd = new THREE.Vector3(),
+      beamDirection = new THREE.Vector3(),
+      up = new THREE.Vector3(0, 1, 0),
+      labelTarget = new THREE.Vector3(),
+      viewport = new THREE.Vector2();
     const choicePositions = [
       new THREE.Vector3(),
       new THREE.Vector3(),
@@ -480,7 +521,8 @@ export default function World({
     const look = new THREE.Vector3(),
       eyeDirection = new THREE.Vector3();
     const moonlight = new THREE.Color("#f5e2c4"),
-      sunlight = new THREE.Color("#ffe0a6");
+      sunlight = new THREE.Color("#ffe0a6"),
+      deepMoonlight = new THREE.Color("#adc9d3");
     const nightColor = new THREE.Color("#101e1a"),
       dawnColor = new THREE.Color("#39473c"),
       morningColor = new THREE.Color("#59604c");
@@ -541,10 +583,19 @@ export default function World({
           8,
           dt,
         );
-        card.position.y =
+        card.position.y = THREE.MathUtils.damp(
+          card.position.y,
           i * 0.09 * (1 - fan) +
-          (1.8 + (selected ? 0.22 : 0)) * Math.sin((fan * Math.PI) / 2);
-        card.position.z = (selected ? 0.28 : -0.4) * fan;
+            (1.8 + (selected ? 0.22 : 0)) * Math.sin((fan * Math.PI) / 2),
+          8,
+          dt,
+        );
+        card.position.z = THREE.MathUtils.damp(
+          card.position.z,
+          (selected ? 0.48 : -0.4) * fan,
+          8,
+          dt,
+        );
         card.rotation.x =
           -Math.PI / 2 + (n.deal * Math.PI) / 2 + (n.fold * Math.PI) / 2;
         card.rotation.y = THREE.MathUtils.damp(
@@ -553,28 +604,20 @@ export default function World({
           8,
           dt,
         );
-        card.rotation.z = -side * 0.13 * fan;
+        card.rotation.z = THREE.MathUtils.damp(
+          card.rotation.z,
+          -side * 0.13 * fan,
+          8,
+          dt,
+        );
       });
-      // A single route through the village. No teleport, repeated descent or reset.
-      wolf.root.position.set(
-        -30 + n.hunt * 32 + n.retreat * 22,
-        0,
-        7.5 + Math.sin(n.retreat * Math.PI) * 4 - n.retreat * 10,
-      );
-      const wolfPresence =
-        cue(n.hunt, 0.58, 0.86) * (1 - cue(n.retreat, 0.7, 1));
-      wolfMaterials.forEach((mat) => {
-        mat.opacity = wolfPresence;
-        mat.depthWrite = wolfPresence > 0.98;
-      });
-      wolf.root.visible = wolfPresence > 0.00001;
-      wolf.root.position.y =
-        -0.75 *
-        cue(Math.hypot(wolf.root.position.x, wolf.root.position.z), 10.4, 11.1);
-      wolf.root.rotation.y = -0.08 + n.retreat * 0.7;
-      const walking =
-        Math.sin(Math.PI * n.hunt) + Math.sin(Math.PI * n.retreat);
-      const stride = (n.hunt * 15 + n.retreat * 16) * 2.6;
+      // Opaque surfaces keep the sculpted silhouette intact throughout the walk.
+      const route = wolfAt(scroll);
+      wolf.root.position.set(route.x, route.y, route.z);
+      wolf.root.visible = route.visible;
+      wolf.root.rotation.y = route.angle;
+      const walking = route.walking,
+        stride = route.stride;
       wolf.legs.forEach(
         (leg, i) =>
           (leg.rotation.z =
@@ -604,6 +647,76 @@ export default function World({
         ring.position.set(choicePositions[i].x, 0.13, choicePositions[i].z);
         (ring.material as THREE.MeshBasicMaterial).opacity = weights[i];
       });
+      const worldPerPixel =
+        (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
+        renderer.getSize(viewport).y;
+      labels.forEach((label, i) => {
+        const id = ids[i];
+        const heading =
+          i === 0
+            ? "MARKED"
+            : i === 1
+              ? houses[id].role.toUpperCase()
+              : n.verdict > 0.5
+                ? houses[id].role.toUpperCase()
+                : "ACCUSED";
+        const text = `${heading} / ${houses[id].name}`;
+        if (text !== label.text) {
+          label.text = text;
+          const ctx = label.canvas.getContext("2d")!;
+          ctx.clearRect(0, 0, 640, 160);
+          ctx.fillStyle = "rgba(16,29,24,.94)";
+          ctx.beginPath();
+          ctx.roundRect(4, 4, 632, 152, 16);
+          ctx.fill();
+          ctx.strokeStyle = i === 1 ? "#95c7b4" : "#d5b57f";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.textAlign = "center";
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.font = "28px sans-serif";
+          ctx.fillText(heading, 320, 46);
+          ctx.fillStyle = "#eee4ca";
+          ctx.font = "52px Georgia";
+          ctx.fillText(houses[id].name, 320, 108);
+          label.texture.needsUpdate = true;
+        }
+        const weight =
+          i === 0
+            ? cue(scroll, 3.65, 4) * (1 - cue(scroll, 4.3, 4.6))
+            : i === 1
+              ? n.vision
+              : cue(scroll, 6.65, 7) * (1 - cue(scroll, 8.3, 8.8));
+        label.sprite.material.opacity =
+          weight *
+          (i === 2 ? 1 - Math.pow(Math.sin(Math.PI * n.verdict), 2) : 1);
+        label.sprite.visible = weight > 0.001;
+        // The verdict is staged at the table; other labels identify the chosen house.
+        if (i === 2) {
+          const a = seats[id].a;
+          label.sprite.position.lerp(
+            labelTarget.set(Math.sin(a) * 2.32, 3.4, Math.cos(a) * 2.32 + 1.2),
+            1 - Math.exp(-7 * dt),
+          );
+        } else
+          label.sprite.position.set(
+            choicePositions[i].x,
+            4.6,
+            choicePositions[i].z,
+          );
+        const labelWidth =
+          (mobile.matches ? 140 : 170) *
+          worldPerPixel *
+          camera.position.distanceTo(label.sprite.position);
+        label.sprite.scale.set(labelWidth, labelWidth / 4, 1);
+      });
+      beamEnd.copy(choicePositions[1]);
+      beamEnd.y = 2.8;
+      beamDirection.copy(beamEnd).sub(beamStart);
+      beam.position.copy(beamStart).add(beamEnd).multiplyScalar(0.5);
+      beam.scale.y = beamDirection.length();
+      beam.quaternion.setFromUnitVectors(up, beamDirection.normalize());
+      (beam.material as THREE.MeshBasicMaterial).opacity = n.vision * 0.38;
       seats.forEach((seat, i) => {
         const leave =
           (i === s.victim ? n.loss : 0) + (i === s.accused ? n.verdict : 0);
@@ -614,6 +727,13 @@ export default function World({
           dt,
         );
         seat.root.position.y = 1.4 + Math.sin(seat.root.rotation.x) * 0.3;
+        const revealed = i === s.accused ? n.verdict : 0;
+        seat.mat.color
+          .copy(seat.baseColor)
+          .lerp(
+            houses[i].role === "Werewolf" ? wolfColor : villageColor,
+            revealed,
+          );
         const a = seats[s.accused].a,
           voteWeight = n.vote * (i === s.victim ? 0 : 1);
         const x = Math.sin(a) * 1.6 + (i - 3.5) * 0.13,
@@ -645,10 +765,14 @@ export default function World({
         .lerp(dawnColor, n.dawn)
         .lerp(morningColor, n.sunrise * 0.6);
       (scene.fog as THREE.FogExp2).color.copy(scene.background as THREE.Color);
-      hemi.intensity = 1.35 + n.dawn * 0.7 + n.sunrise * 0.3;
-      key.intensity = 3.4 + n.dawn * 0.9;
-      key.color.copy(moonlight).lerp(sunlight, n.dawn);
-      fill.intensity = 1.4 + n.dawn * 0.3;
+      const nightMood = n.asleep * (1 - n.dawn);
+      hemi.intensity = 1.35 - nightMood * 0.35 + n.dawn * 0.7 + n.sunrise * 0.3;
+      key.intensity = 3.4 - nightMood * 0.8 + n.dawn * 0.9;
+      key.color
+        .copy(moonlight)
+        .lerp(deepMoonlight, nightMood)
+        .lerp(sunlight, n.dawn);
+      fill.intensity = 1.4 - nightMood * 0.3 + n.dawn * 0.3;
       starMat.opacity = 0.65 * (1 - n.dawn);
       renderer.render(scene, camera);
       frame = requestAnimationFrame(render);

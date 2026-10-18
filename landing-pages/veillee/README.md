@@ -2,9 +2,9 @@
 
 An original, fictional Werewolf game night. One miniature village carries a ten-chapter journey from dusk to sunrise: roles are dealt once, shutters close, a sculpted wolf arrives, the seer looks behind a door, and the village votes.
 
-Choose the wolves’ target, inspect an identity and cast a vote. Lights go out, tokens gather and eliminated figures remain on the table. Scrolling backwards retraces the same round. Prepare a printable moderator guide for 8–18 players plus one moderator. This is a local illustrated story, not an online multiplayer game or an official edition.
+Choose the wolves’ target, inspect an identity and cast a vote. Named markers connect each choice to its house or seat. A thread of light follows the seer’s vision. Lights go out, tokens gather and eliminated figures remain on the table; the verdict reveals the accused’s allegiance and counts the survivors. Scrolling backwards retraces the same round. Prepare a printable moderator guide for 8–18 players plus one moderator. This is a local illustrated story, not an online multiplayer game or an official edition.
 
-The journey spans 21 viewport heights. Cameras, shutters, cards and lighting follow continuous scroll transitions. Mobile uses dedicated camera distances, a clear reading area and capped render resolution.
+The journey spans 21 viewport heights. Cameras, shutters, cards and lighting follow continuous scroll transitions. Text remains pinned throughout each fade. The wolf keeps an opaque silhouette, cards settle smoothly when a role changes, and moonlight gives way to dawn. Mobile uses dedicated camera distances, a clear reading area and capped render resolution.
 
 ## Development
 

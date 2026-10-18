@@ -168,6 +168,17 @@ header {
   position: relative;
   pointer-events: none;
 }
+.chapter-track {
+  /* Pin before the incoming fade and release after the outgoing fade. */
+  position: absolute;
+  inset: -100svh 0;
+}
+.chapter:first-child .chapter-track {
+  top: 0;
+}
+.chapter:last-child .chapter-track {
+  bottom: 0;
+}
 .chapter-screen {
   height: 100svh;
   min-height: 620px;
@@ -1151,5 +1162,67 @@ footer p em {
       transparent 70%,
       #101b1940
     );
+  }
+}
+
+.round-summary {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  max-width: 345px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.round-summary span {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  margin-bottom: 9px;
+  color: var(--muted);
+}
+.story-result small {
+  display: block;
+  margin-top: 10px;
+  color: var(--accent);
+  font-size: 10px;
+}
+.story-choice p {
+  min-height: 3.4em;
+}
+@media (max-width: 760px) {
+  .round-summary {
+    font-size: 10px;
+    max-width: 290px;
+  }
+  .story-choice button,
+  .role-buttons .button {
+    min-height: 44px;
+  }
+  .story-result small {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 760px), (max-width: 1024px) and (orientation: portrait) {
+  .chapter:not(.chapter-0) .chapter-screen {
+    padding-top: 84px;
+  }
+  .chapter:has(.story-choice) .description {
+    font-size: 11px;
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+  .story-choice {
+    margin-top: 14px;
+  }
+}
+@media (max-width: 760px) and (max-height: 740px) {
+  .chapter:not(.chapter-0) .chapter-screen {
+    padding-top: 68px;
+  }
+  .chapter:has(.story-choice) .eyebrow {
+    margin-bottom: 12px;
+  }
+  .chapter:has(.story-choice) h2 {
+    margin-bottom: 16px;
   }
 }

@@ -27,7 +27,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { useJourney } from "@/lib/use-journey";
 import { download } from "@/lib/journey";
-import { houses } from "@/lib/story";
+import { houses, roundResult } from "@/lib/story";
 import { roles, party, hostGuide } from "@/lib/game";
 const World = dynamic(() => import("./world"), { ssr: false });
 const chapters = [
@@ -172,6 +172,7 @@ export default function Experience() {
     [vision, setVision] = useState(4),
     [accused, setAccused] = useState(4);
   const setup = party(players);
+  const result = roundResult(victim, accused);
   function toggle() {
     j.setPaused(!j.paused);
     toast(j.paused ? "The night is moving again" : "A quieter night", {
@@ -283,180 +284,193 @@ export default function Experience() {
             key={c.label}
             aria-labelledby={`title-${i}`}
           >
-            <div className="chapter-screen">
-              <div className="chapter-copy">
-                <p className="eyebrow">
-                  <span />
-                  {c.eyebrow}
-                </p>
-                {i === 0 ? (
-                  <h1 id={`title-${i}`}>{c.title}</h1>
-                ) : (
-                  <h2 id={`title-${i}`}>{c.title}</h2>
-                )}
-                <p className="description">{c.copy}</p>
-                {i === 0 && (
-                  <>
-                    <Button onClick={() => j.go(1)}>
-                      Enter the village <ArrowDown size={17} />
-                    </Button>
-                    <div className="hero-detail">
-                      <span>8–18 PLAYERS</span>
-                      <i />
-                      <span>ONE UNFORGETTABLE NIGHT</span>
-                    </div>
-                  </>
-                )}
-                {i === 2 && (
-                  <div className="roles">
-                    <div
-                      className="role-buttons"
-                      role="group"
-                      aria-label="Explore a role"
-                    >
-                      {roles.map((r, n) => (
-                        <Button
-                          key={r.name}
-                          variant="outline"
-                          aria-pressed={role === n}
-                          onClick={() => setRole(n)}
-                        >
-                          {r.name}
-                        </Button>
-                      ))}
-                    </div>
-                    <p className="role-note" aria-live="polite">
-                      <strong>{roles[role].clan}</strong>
-                      {roles[role].detail}
+            <div className="chapter-track">
+              <div className="chapter-screen">
+                <div className="chapter-copy">
+                  <p className="eyebrow">
+                    <span />
+                    {c.eyebrow}
+                  </p>
+                  {i === 0 ? (
+                    <h1 id={`title-${i}`}>{c.title}</h1>
+                  ) : (
+                    <h2 id={`title-${i}`}>{c.title}</h2>
+                  )}
+                  <p className="description">{c.copy}</p>
+                  {i === 0 && (
+                    <>
+                      <Button onClick={() => j.go(1)}>
+                        Enter the village <ArrowDown size={17} />
+                      </Button>
+                      <div className="hero-detail">
+                        <span>8–18 PLAYERS</span>
+                        <i />
+                        <span>ONE UNFORGETTABLE NIGHT</span>
+                      </div>
+                    </>
+                  )}
+                  {i === 1 && (
+                    <p className="round-summary">
+                      <span>THIS ILLUSTRATED ROUND</span>8 players · 2 wolves ·
+                      1 seer
                     </p>
-                  </div>
-                )}
-                {(i === 4 || i === 5 || i === 7) && (
-                  <div className="story-choice">
-                    <span className="choice-label">
-                      {i === 4 ? (
-                        <Flame size={14} />
-                      ) : i === 5 ? (
-                        <Eye size={14} />
-                      ) : (
-                        <Vote size={14} />
-                      )}
-                      {i === 4
-                        ? "Mark a house"
-                        : i === 5
-                          ? "Look behind a door"
-                          : "Cast the village’s vote"}
-                    </span>
-                    <div
-                      role="group"
-                      aria-label={
-                        i === 4
-                          ? "Choose the wolves’ target"
+                  )}
+                  {i === 2 && (
+                    <div className="roles">
+                      <div
+                        className="role-buttons"
+                        role="group"
+                        aria-label="Explore a role"
+                      >
+                        {roles.map((r, n) => (
+                          <Button
+                            key={r.name}
+                            variant="outline"
+                            aria-pressed={role === n}
+                            onClick={() => setRole(n)}
+                          >
+                            {r.name}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="role-note" aria-live="polite">
+                        <strong>{roles[role].clan}</strong>
+                        {roles[role].detail}
+                      </p>
+                    </div>
+                  )}
+                  {(i === 4 || i === 5 || i === 7) && (
+                    <div className="story-choice">
+                      <span className="choice-label">
+                        {i === 4 ? (
+                          <Flame size={14} />
+                        ) : i === 5 ? (
+                          <Eye size={14} />
+                        ) : (
+                          <Vote size={14} />
+                        )}
+                        {i === 4
+                          ? "Mark a house"
                           : i === 5
-                            ? "Choose the seer’s vision"
-                            : "Choose a suspect"
-                      }
-                    >
-                      {(i === 4 ? [0, 2, 5] : [1, 4, 6]).map((id) => (
-                        <Button
-                          key={id}
-                          variant="outline"
-                          aria-pressed={
-                            (i === 4 ? victim : i === 5 ? vision : accused) ===
-                            id
-                          }
-                          onClick={() =>
-                            (i === 4
-                              ? setVictim
-                              : i === 5
-                                ? setVision
-                                : setAccused)(id)
-                          }
-                        >
-                          {houses[id].name}
-                        </Button>
-                      ))}
+                            ? "Look behind a door"
+                            : "Cast the village’s vote"}
+                      </span>
+                      <div
+                        role="group"
+                        aria-label={
+                          i === 4
+                            ? "Choose the wolves’ target"
+                            : i === 5
+                              ? "Choose the seer’s vision"
+                              : "Choose a suspect"
+                        }
+                      >
+                        {(i === 4 ? [0, 2, 5] : [1, 4, 6]).map((id) => (
+                          <Button
+                            key={id}
+                            variant="outline"
+                            aria-pressed={
+                              (i === 4
+                                ? victim
+                                : i === 5
+                                  ? vision
+                                  : accused) === id
+                            }
+                            onClick={() =>
+                              (i === 4
+                                ? setVictim
+                                : i === 5
+                                  ? setVision
+                                  : setAccused)(id)
+                            }
+                          >
+                            {houses[id].name}
+                          </Button>
+                        ))}
+                      </div>
+                      <p
+                        aria-live="polite"
+                        key={i === 4 ? victim : i === 5 ? vision : accused}
+                      >
+                        {i === 4
+                          ? `${houses[victim].name} is marked. Its light will be missing at dawn.`
+                          : i === 5
+                            ? `${houses[vision].name}: ${houses[vision].role.toLowerCase()}. One secret is yours to keep.`
+                            : `The tokens gather around ${houses[accused].name.toLowerCase()}. Scroll to hear the verdict.`}
+                      </p>
                     </div>
-                    <p
-                      aria-live="polite"
-                      key={i === 4 ? victim : i === 5 ? vision : accused}
-                    >
-                      {i === 4
-                        ? `${houses[victim].name} is marked. Its light will be missing at dawn.`
-                        : i === 5
-                          ? `${houses[vision].name}: ${houses[vision].role.toLowerCase()}. One secret is yours to keep.`
-                          : `The tokens gather around ${houses[accused].name.toLowerCase()}. Scroll to hear the verdict.`}
+                  )}
+                  {i === 6 && (
+                    <p className="story-result">
+                      <Flame size={18} />
+                      <span>
+                        <strong>{houses[victim].name} is dark.</strong> One
+                        villager has left the circle. Seven players remain; the
+                        empty place stays visible.
+                      </span>
                     </p>
-                    <small>
-                      An illustrated round. Your choices shape this story.
-                    </small>
-                  </div>
-                )}
-                {i === 6 && (
-                  <p className="story-result">
-                    <Flame size={18} />
-                    <span>
-                      <strong>{houses[victim].name} is dark.</strong> One
-                      villager has left the circle. Their token stays down.
-                    </span>
-                  </p>
-                )}
-                {i === 8 && (
-                  <p className="story-result" aria-live="polite">
-                    <Eye size={18} />
-                    <span>
-                      <strong>
-                        {houses[accused].name}:{" "}
-                        {houses[accused].role.toLowerCase()}.
-                      </strong>
-                      {houses[accused].role === "Werewolf"
-                        ? " A wolf is out. But another is still listening."
-                        : " An innocent leaves the table. The wolves keep their secret."}
-                    </span>
-                  </p>
-                )}
-                {i === 9 && (
-                  <div className="party-planner">
-                    <div className="player-label">
-                      <span>Players at your table</span>
-                      <strong>
-                        {players}
-                        <small> + 1 moderator</small>
-                      </strong>
+                  )}
+                  {i === 8 && (
+                    <p className="story-result" aria-live="polite">
+                      <Eye size={18} />
+                      <span>
+                        <strong>
+                          {houses[accused].name}:{" "}
+                          {houses[accused].role.toLowerCase()}.
+                        </strong>
+                        {houses[accused].role === "Werewolf"
+                          ? " A wolf is out. But another is still listening."
+                          : " An innocent leaves the table. The wolves keep their secret."}
+                        <small>
+                          {result.remaining} players remain · {result.wolves}{" "}
+                          {result.wolves === 1 ? "wolf" : "wolves"} still hidden
+                        </small>
+                      </span>
+                    </p>
+                  )}
+                  {i === 9 && (
+                    <div className="party-planner">
+                      <div className="player-label">
+                        <span>Players at your table</span>
+                        <strong>
+                          {players}
+                          <small> + 1 moderator</small>
+                        </strong>
+                      </div>
+                      <Slider
+                        value={[players]}
+                        min={8}
+                        max={18}
+                        step={1}
+                        thumbLabel="Number of players"
+                        onValueChange={(v) =>
+                          setPlayers(Array.isArray(v) ? v[0] : v)
+                        }
+                      />
+                      <p aria-live="polite">
+                        {setup.wolves} wolves · 1 seer · {setup.villagers}{" "}
+                        villagers
+                      </p>
+                      <Button
+                        onClick={() =>
+                          download("veillee-host-guide.txt", hostGuide(players))
+                        }
+                      >
+                        Keep the host guide <Download size={16} />
+                      </Button>
+                      <small>Our simple starter variant. Free to print.</small>
                     </div>
-                    <Slider
-                      value={[players]}
-                      min={8}
-                      max={18}
-                      step={1}
-                      thumbLabel="Number of players"
-                      onValueChange={(v) =>
-                        setPlayers(Array.isArray(v) ? v[0] : v)
-                      }
-                    />
-                    <p aria-live="polite">
-                      {setup.wolves} wolves · 1 seer · {setup.villagers}{" "}
-                      villagers
-                    </p>
-                    <Button
-                      onClick={() =>
-                        download("veillee-host-guide.txt", hostGuide(players))
-                      }
-                    >
-                      Keep the host guide <Download size={16} />
-                    </Button>
-                    <small>Our simple starter variant. Free to print.</small>
-                  </div>
-                )}
-              </div>
-              <div className="chapter-caption">
-                <span>{c.time}</span>
-                <span>
-                  {i === 0
-                    ? "SCROLL TO LET THE NIGHT UNFOLD"
-                    : "A NIGHT IN TEN CHAPTERS"}
-                </span>
-                <ArrowDown size={17} />
+                  )}
+                </div>
+                <div className="chapter-caption">
+                  <span>{c.time}</span>
+                  <span>
+                    {i === 0
+                      ? "SCROLL TO LET THE NIGHT UNFOLD"
+                      : "A NIGHT IN TEN CHAPTERS"}
+                  </span>
+                  <ArrowDown size={17} />
+                </div>
               </div>
             </div>
           </section>
@@ -539,7 +553,7 @@ export default function Experience() {
       <div className="journey-line" aria-hidden="true" />
       <Toaster />
       <noscript>
-        <style>{`.loader{display:none}.world-fallback{opacity:1}.chapter-copy{opacity:1!important}`}</style>
+        <style>{`.loader{display:none}.world-fallback{opacity:1}.chapter{height:auto}.chapter-track{position:static}.chapter-screen{position:relative;height:auto;min-height:100svh}.chapter-copy{opacity:1!important;transform:none}`}</style>
       </noscript>
     </div>
   );

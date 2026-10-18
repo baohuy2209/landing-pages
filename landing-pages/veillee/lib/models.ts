@@ -49,9 +49,9 @@ export function makeWolf() {
   const root = new THREE.Group();
   const fur = new THREE.MeshPhysicalMaterial({
     color: "#4c5c56",
-    roughness: 0.68,
+    roughness: 0.78,
     metalness: 0.12,
-    clearcoat: 0.15,
+    clearcoat: 0.06,
   });
   const muzzle = material("#788578", 0.72, 0.08),
     black = material("#182320", 0.24);
@@ -70,13 +70,13 @@ export function makeWolf() {
   root.add(head);
   ellipsoid(head, fur, 0.1, 0.08, 0, 0.43, 0.46, 0.34);
   ellipsoid(head, muzzle, 0.44, -0.04, 0, 0.53, 0.15, 0.18).rotation.z = 0.1;
-  ellipsoid(head, black, 0.83, -0.01, 0, 0.105, 0.085, 0.13);
+  ellipsoid(head, black, 0.98, -0.01, 0, 0.08, 0.07, 0.11);
   ellipsoid(head, fur, 0.42, -0.19, 0, 0.4, 0.08, 0.19);
   for (const s of [-1, 1]) {
     const earShape = new THREE.Shape();
     earShape.moveTo(-0.2, 0);
-    earShape.quadraticCurveTo(-0.17, 0.27, 0, 0.62);
-    earShape.quadraticCurveTo(0.16, 0.36, 0.2, 0.02);
+    earShape.quadraticCurveTo(-0.17, 0.27, 0, 0.49);
+    earShape.quadraticCurveTo(0.16, 0.3, 0.2, 0.02);
     earShape.closePath();
     const ear = mesh(
       head,
@@ -125,7 +125,7 @@ export function makeWolf() {
         0.105,
       );
       lower.rotation.z = x < 0 ? 0.24 : -0.05;
-      ellipsoid(leg, muzzle, 0.14, -1.03, 0, 0.19, 0.085, 0.13);
+      ellipsoid(leg, fur, x < 0 ? -0.12 : 0.12, -1.03, 0, 0.19, 0.085, 0.13);
       legs.push(leg);
     }
   const tail = new THREE.Group();

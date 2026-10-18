@@ -40,3 +40,27 @@ export function windowLight(
     (1 - (house === accused ? n.verdict : 0));
   return alive * (1 - n.asleep * 0.9 * (1 - n.dawn));
 }
+
+// The wolf follows a single grounded route, parked outside the frame at both ends.
+export function wolfAt(p: number) {
+  const n = nightAt(p);
+  const x = -42 + n.hunt * 44 + n.retreat * 40;
+  const z = 7.5 + Math.sin(n.retreat * Math.PI) * 4 - n.retreat * 20;
+  return {
+    x,
+    y: -0.75 * cue(Math.hypot(x, z), 10.4, 11.1),
+    z,
+    angle: -0.08 + n.retreat * 0.7,
+    stride: (n.hunt * 44 + n.retreat * 40) * 2.8,
+    walking: Math.sin(Math.PI * n.hunt) + Math.sin(Math.PI * n.retreat),
+    visible: n.hunt > 0 && n.retreat < 1,
+  };
+}
+
+export function roundResult(victim: number, accused: number) {
+  const remaining = houses.filter((_, i) => i !== victim && i !== accused);
+  return {
+    remaining: remaining.length,
+    wolves: remaining.filter((house) => house.role === "Werewolf").length,
+  };
+}

@@ -44,7 +44,8 @@ export function makeStage(host: HTMLDivElement, dark = false) {
     near: 0.5,
     far: 90,
   });
-  key.shadow.normalBias = 0.035;
+  key.shadow.normalBias = 0.025;
+  key.shadow.radius = 3;
   key.shadow.bias = -0.0001;
   scene.add(key, key.target);
   const fill = new THREE.DirectionalLight(
@@ -85,6 +86,7 @@ export function makeStage(host: HTMLDivElement, dark = false) {
     scene.traverse((o) => {
       if (
         o instanceof THREE.Mesh ||
+        o instanceof THREE.Sprite ||
         o instanceof THREE.Points ||
         o instanceof THREE.Line
       ) {
