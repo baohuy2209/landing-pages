@@ -57,6 +57,8 @@ On Vercel, create a separate project for each site:
 | Landing page | `landing-pages/<project>` | Next.js |
 | Collection showcase | `www` | Other — no build step |
 
+Each project’s `vercel.json` skips builds when its folder is unchanged since its previous deployment. The first deployment always builds.
+
 ## Support
 
 Created by **[LN](https://lndev.me)**.
